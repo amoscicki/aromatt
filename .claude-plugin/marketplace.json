@@ -1,19 +1,21 @@
 {
   "name": "aromatt",
   "owner": {
-    "name": "Arkadiusz Moscicki"
+    "name": "Arkadiusz Moscicki",
+    "url": "https://github.com/amoscicki"
   },
+  "description": "Personal Claude Code plugins by Arkadiusz Moscicki",
   "plugins": [
     {
       "name": "docs-researcher",
+      "description": "Subagent that researches documentation and saves to .claude/knowledge/ as project-local knowledge base",
       "source": "./docs-researcher",
-      "description": "Research technical documentation and create knowledge files",
       "version": "0.6.0"
     },
     {
       "name": "swarm",
+      "description": "Multi-agent parallel task orchestration with wave-based execution, automatic auditing, and model escalation",
       "source": "./swarm",
-      "description": "Multi-agent parallel task orchestration with wave-based execution",
       "version": "1.0.0"
     }
   ]
