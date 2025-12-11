@@ -1,0 +1,20 @@
+{
+  "name": "aromatt",
+  "owner": {
+    "name": "Arkadiusz Moscicki"
+  },
+  "plugins": [
+    {
+      "name": "docs-researcher",
+      "source": "./docs-researcher",
+      "description": "Research technical documentation and create knowledge files",
+      "version": "0.6.0"
+    },
+    {
+      "name": "swarm",
+      "source": "./swarm",
+      "description": "Multi-agent parallel task orchestration with wave-based execution",
+      "version": "1.0.0"
+    }
+  ]
+}
