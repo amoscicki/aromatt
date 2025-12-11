@@ -1,0 +1,8 @@
+{
+  "name": "docs-researcher",
+  "version": "0.6.0",
+  "description": "Subagent that researches technology documentation. Saves to .claude/knowledge/ or custom path. Intelligently updates existing files (preserves current, replaces outdated, adds missing)",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  }
+}

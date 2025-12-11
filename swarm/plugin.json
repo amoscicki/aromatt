@@ -1,0 +1,15 @@
+{
+  "name": "swarm",
+  "version": "1.0.0",
+  "description": "Multi-agent parallel task orchestration with wave-based execution, automatic auditing, and model escalation",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amoscicki/dotfiles"
+  },
+  "commands": "./commands",
+  "skills": "./skills",
+  "agents": "./agents"
+}
