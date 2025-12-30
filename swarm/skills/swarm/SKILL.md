@@ -12,18 +12,19 @@ Invoke this skill when:
 
 ## Roles
 
-The swarm system has four agent roles:
+The swarm system has five agent roles:
 
 | Role | Purpose | When Spawned |
 |------|---------|--------------|
 | **Architect** | Plan generation, task decomposition, dependency mapping | Start of swarm, re-planning phases |
-| **Worker** | Execute individual tasks | During wave execution |
-| **Auditor** | Validate outputs (tools + AI) | After each wave completes |
-| **Fixer** | Auto-fix simple issues found by auditors | When auditors find trivial issues |
+| **Worker** | Execute individual tasks, write reports to files | During wave execution |
+| **Reviewer (ultrathink)** | MANDATORY wave review, reads ALL reports | End of EVERY wave |
+| **Reviewer (opus)** | Optional task-scoped review | Complex tasks (optional) |
+| **Fixer** | Auto-fix HIGH priority issues | When review returns HIGH |
 
 ## Worker Agents
 
-Worker agents are defined in `.claude/agents/` and run in **parallel with separate context windows**:
+Worker agents are defined in `./agents/` and run in **parallel with separate context windows**:
 
 | Agent | Model | Purpose | Use For |
 |-------|-------|---------|---------|
@@ -31,32 +32,31 @@ Worker agents are defined in `.claude/agents/` and run in **parallel with separa
 | `swarm-worker-opus` | opus | Standard tasks | Implement, integrate, fix bugs |
 | `swarm-worker-ultrathink` | opus | Complex tasks | Architecture, algorithms, edge cases |
 
-**Spawning Pattern (BACKGROUND - MANDATORY)**:
+## Review Agents
+
+| Agent | Model | Purpose | When Used |
+|-------|-------|---------|-----------|
+| `swarm-reviewer-ultrathink` | opus | Wave review (ALL tasks) | MANDATORY end of every wave |
+| `swarm-reviewer-opus` | opus | Task review (single task) | Optional for complex tasks |
+
+**Review Output**: `{priority}|{action}|{review-path}` where priority is HIGH/MED/LOW.
+
+## Spawning Pattern (Fire-and-Forget)
 
 All agents MUST be spawned with `run_in_background: true`:
 ```
-Task(subagent_type="swarm-worker-haiku", prompt="Task 1.1: ...", run_in_background=true)
-→ Returns: agentId "worker-1-abc"
+# Workers - include report path in prompt
+Task(subagent_type="swarm-worker-haiku",
+     prompt="Task 1.1: ... Report: .swarm/reports/plan/wave-1/task-1.1.md",
+     run_in_background=true)
+→ Returns: agentId (store mapping taskId→agentId)
 
-Task(subagent_type="swarm-worker-opus", prompt="Task 1.2: ...", run_in_background=true)
-→ Returns: agentId "worker-2-def"
-
-Task(subagent_type="swarm-worker-opus", prompt="Task 1.3: ...", run_in_background=true)
-→ Returns: agentId "worker-3-ghi"
+# DO NOT POLL - wait at end of wave only
+TaskOutput(task_id=lastAgentId, block=true)
+# Ignore output content - workers wrote to files
 ```
 
-**Collecting Results (incremental)**:
-```
-# Poll for completed workers
-AgentOutputTool(agentId="worker-1-abc", block=false)
-→ "running" or "completed" with output
-
-# Wait when needed
-AgentOutputTool(agentId="worker-3-ghi", block=true)
-→ Blocks until worker completes
-```
-
-Each agent runs in its own context window (up to 10 parallel), returns results via AgentOutputTool.
+**ZERO-POLLING**: Orchestrator never reads worker output. Communication via files only.
 
 ## CRITICAL: Orchestrator Context Isolation
 
@@ -97,17 +97,22 @@ Load these based on current phase:
 ## Quick Start
 
 1. **Receive task** (description, file path, or "resume")
-2. **Spawn Architect** (run_in_background: true) → wait with AgentOutputTool(block: true)
+2. **Spawn Architect** (run_in_background: true) → wait with TaskOutput(block: true)
 3. **Confirm with user** (checkpoints, model assignments)
-4. **Execute waves**:
-   - SPAWN all workers (run_in_background: true, get agentIds)
-   - POLL with AgentOutputTool(block: false) for results
-   - Process completed tasks incrementally
-   - Use AgentOutputTool(block: true) for last pending agent
-5. **Audit after each wave** (spawn auditors in background)
-6. **Checkpoint with user** at agreed points
-7. **Update plan file** incrementally as agents complete
-8. **Repeat** until complete
+4. **Execute waves** (ZERO-POLLING):
+   - SPAWN all workers with report paths in prompts
+   - Store taskId→agentId mapping (NOT output)
+   - WAIT at end of wave only: TaskOutput(lastAgentId, block: true)
+   - Ignore output content - workers wrote to files
+5. **MANDATORY wave review**: spawn swarm-reviewer-ultrathink
+   - Returns: `{priority}|{action}|{review-path}`
+   - HIGH → spawn fixers, wait, re-review
+   - MED → note in plan, continue
+   - LOW → proceed
+6. **Optional task review**: spawn swarm-reviewer-opus for complex tasks
+7. **Checkpoint with user** at agreed points
+8. **Update plan** with file paths only (not content)
+9. **Repeat** until complete
 
 ## Plan File Location
 

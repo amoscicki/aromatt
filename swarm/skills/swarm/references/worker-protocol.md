@@ -58,22 +58,30 @@ This file persists for:
 - Resume scenarios
 - Future reference
 
-### 2. Return Brief Summary to Orchestrator
+### 2. Return MINIMAL Summary to Orchestrator
 
-Your final message back should be SHORT (< 500 chars):
+**CRITICAL: Context conservation is paramount.** Your final message MUST be under 100 characters:
 
-```markdown
-## Task {ID}: {success|failed|partial}
-
-Files: `file1.ts`, `file2.ts`
-Summary: {1-2 sentences}
-Details: `.swarm/reports/task-{ID}.md`
+```
+{ID}|{success|failed|partial}|{report-path}
 ```
 
-**Why this split?**
-- Orchestrator context stays lean (~20k tokens for coordination)
-- Detailed analysis preserved in files (200k tokens of work available)
-- On-demand retrieval when orchestrator needs details
+**Example**:
+```
+2.3|success|.swarm/reports/fix-auth/wave-2/task-2.3.md
+```
+
+**That's it.** No explanations, no file lists, no summaries. The orchestrator:
+- Does NOT read your output by default
+- Does NOT poll for your status
+- Only checks completion at end of wave
+- Reads report file ONLY if review requires it
+
+**Why ultra-minimal?**
+- Orchestrator context stays lean (~5-10k for coordination only)
+- Zero context waste on worker details
+- All information persists in report files
+- Review agents read reports directly, not orchestrator
 
 ## Execution Rules
 
@@ -180,33 +188,21 @@ When in doubt, look at similar files in the codebase.
 For plan `fix-auth-service-tokens-inprogress.md`:
 
 ### Success
-```markdown
-## Task 2.3: success
-
-Files: `booking.ts`, `bookings.repo.ts`
-Summary: Added cancellationReason field to Booking model and mapper.
-Details: `.swarm/reports/fix-auth-service-tokens/wave-2/task-2.3.md`
+```
+2.3|success|.swarm/reports/fix-auth-service-tokens/wave-2/task-2.3.md
 ```
 
 ### Failed
-```markdown
-## Task 3.1: failed
-
-Files: None
-Summary: Import path `@effect/schema` not found, should be `effect/Schema`.
-Details: `.swarm/reports/fix-auth-service-tokens/wave-3/task-3.1.md`
-Recommend: Update task or escalate
+```
+3.1|failed|.swarm/reports/fix-auth-service-tokens/wave-3/task-3.1.md
 ```
 
 ### Partial
-```markdown
-## Task 1.4: partial
-
-Files: `Button.tsx`
-Summary: Added variant prop, blocked on design system colors.
-Details: `.swarm/reports/fix-auth-service-tokens/wave-1/task-1.4.md`
-Blocked: Need color mappings for variants
 ```
+1.4|partial|.swarm/reports/fix-auth-service-tokens/wave-1/task-1.4.md
+```
+
+**All details go in the report file. Orchestrator sees ONLY the pipe-delimited status.**
 
 ## Performance Tips
 

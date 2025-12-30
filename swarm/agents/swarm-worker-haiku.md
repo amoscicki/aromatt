@@ -79,7 +79,7 @@ Read("P:\\project\\src\\file.ts")                 # ✅ Verify
 
 **Output Protocol**:
 
-1. **Write detailed report to structured path** (for on-demand retrieval):
+1. **Write detailed report to structured path** (for review agents):
 
    Path: `.swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md`
    - `{plan-slug}` = provided in your task prompt (e.g., "fix-auth-service-tokens")
@@ -90,14 +90,14 @@ Read("P:\\project\\src\\file.ts")                 # ✅ Verify
    Write(".swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md", "# Task {ID}\n\n## Status: success\n\n## Changes\n{details}")
    ```
 
-2. **Return brief summary** (< 500 chars to orchestrator):
+2. **Return ULTRA-MINIMAL status** (< 100 chars, pipe-delimited):
    ```
-   ## Task {ID}: success|failed|partial
+   {ID}|{success|failed|partial}|{report-path}
+   ```
 
-   Files: `file1.ts`
-   Summary: {1 sentence}
-   Details: `.swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md`
-   ```
+   **Example**: `2.3|success|.swarm/reports/fix-auth/wave-2/task-2.3.md`
+
+   **CRITICAL**: Orchestrator does NOT read this output by default. Zero context waste.
 
 **Rules**:
 - Stay within task scope

@@ -77,19 +77,20 @@ Read("${CLAUDE_PLUGIN_ROOT}/skills/swarm/references/orchestrator-protocol.md")
    - Auto-edit → execute with minimal pauses
    - Default → wave-by-wave checkpoints
 
-3. **Execution flow (with background agents)**:
+3. **Execution flow (ZERO-POLLING)**:
    ```
    Architect creates plan (run_in_background: true)
-        ↓ AgentOutputTool(block: true) to wait for plan
+        ↓ TaskOutput(block: true) - ignore output, read plan file
    User confirms checkpoints
         ↓
    For each wave:
-     → SPAWN Workers (run_in_background: true, get agentIds)
-     → POLL with AgentOutputTool(block: false) for results
-     → Process completed tasks incrementally
-     → SPAWN Auditors (background)
-     → POLL for audit results
-     → Fix trivial issues
+     → SPAWN Workers (with report paths in prompts)
+     → Store taskId→agentId mapping only (NOT output)
+     → WAIT at end: TaskOutput(lastAgentId, block: true)
+     → Ignore output - workers wrote to files
+     → Update plan with file paths
+     → MANDATORY: spawn swarm-reviewer-ultrathink
+     → Process review: HIGH→fix, MED→defer, LOW→proceed
      → Checkpoint if scheduled
         ↓
    Complete
@@ -97,10 +98,11 @@ Read("${CLAUDE_PLUGIN_ROOT}/skills/swarm/references/orchestrator-protocol.md")
 
 4. **Key rules**:
    - **ALL agents spawn with run_in_background: true**
-   - Use `AgentOutputTool(block: false)` for polling
-   - Use `AgentOutputTool(block: true)` when you must wait
-   - Process results incrementally (don't wait for all)
-   - Track agentIds mapped to task IDs
+   - **NEVER poll with block: false** - waste of context
+   - **NEVER read worker output** - all in files
+   - Include report path in EVERY worker prompt
+   - MANDATORY swarm-reviewer-ultrathink at end of EVERY wave
+   - Review returns: `{priority}|{action}|{path}`
    - Only orchestrator writes to plan file
    - Model escalation: haiku → opus → opus-ultrathink
 

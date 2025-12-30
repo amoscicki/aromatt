@@ -100,17 +100,14 @@ Your orchestrator has already verified the Constitution. You focus on execution 
    """)
    ```
 
-2. **Return brief summary** (< 500 chars to orchestrator):
+2. **Return ULTRA-MINIMAL status** (< 100 chars, pipe-delimited):
    ```
-   ## Task {ID}: success|failed|partial
-
-   Files: `file1.ts`, `file2.ts`
-   Summary: {1-2 sentences}
-   Complexity: {what was tricky}
-   Details: `.swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md`
+   {ID}|{success|failed|partial}|{report-path}
    ```
 
-**Why file-first**: Your deep analysis is valuable. Writing to file preserves it for reviews, debugging, and future reference. Orchestrator stays lean but can read details on-demand.
+   **Example**: `2.3|success|.swarm/reports/fix-auth/wave-2/task-2.3.md`
+
+**CRITICAL**: Orchestrator does NOT read this output. Your deep analysis is preserved in files for review agents. Zero context waste on orchestrator side.
 
 **Rules**:
 - Take time to think thoroughly

@@ -10,15 +10,22 @@ You (main Claude) are the orchestrator. Your job is to coordinate, delegate, and
 4. **Incremental processing** - Process results as they complete, don't wait for all
 5. **User in control** - Confirm before major decisions, respect checkpoints
 
-## CRITICAL: Context Isolation
+## CRITICAL: Context Isolation & Zero-Polling
 
 **Agents run in SEPARATE context windows. Their work NEVER enters your context.**
 
 This is the ENTIRE PURPOSE of using subagents:
 - Subagents have their own 200k token context
 - They do heavy work (exploration, implementation) in THEIR context
-- They return ONLY a brief summary to you
-- Your context stays lean (~10-20k) for coordination
+- They return ONLY a pipe-delimited status line (< 100 chars)
+- **You do NOT read their output by default**
+- Your context stays ultra-lean (~5-10k for coordination)
+
+**ZERO-POLLING PRINCIPLE:**
+- Fire-and-forget: spawn workers, don't poll
+- Wait for ALL workers at end of wave with single blocking call
+- Review agents read report files directly, not you
+- You track only: plan state, file paths, completion status
 
 **YOUR ALLOWED TOOLS** (enforced by slash command):
 ```
@@ -44,7 +51,7 @@ Bash("pnpm build")      # ❌ Workers do this
 Bash("pnpm test")       # ❌ Workers do this
 ```
 
-**CORRECT - Orchestrator pattern with background agents:**
+**CORRECT - Orchestrator pattern with ZERO-POLLING:**
 ```
 # Architect assesses and creates plan (in THEIR context)
 Task(swarm-worker-opus, "Assess: run tsc, analyze errors, write plan to .swarm/fix-ts.md",
@@ -52,31 +59,35 @@ Task(swarm-worker-opus, "Assess: run tsc, analyze errors, write plan to .swarm/f
 → Returns immediately with agentId: "architect-abc123"
 
 # Wait for architect to complete (blocking since we need the plan)
-AgentOutputTool(agentId: "architect-abc123", block: true)
-→ Returns: "Found 47 errors in 16 files. Plan written to .swarm/fix-ts.md"
+TaskOutput(task_id: "architect-abc123", block: true)
+→ Returns: "plan|success|.swarm/fix-ts.md" (you ignore this output)
 
-# You read the plan file (allowed)
+# You read ONLY the plan file (allowed)
 Read(".swarm/fix-ts.md")
 
-# Workers implement IN PARALLEL, NON-BLOCKING (in THEIR contexts)
-Task(swarm-worker-haiku, "Implement task 1.1 per .swarm/fix-ts.md", run_in_background: true)
-→ Returns: agentId: "worker-1-def456"
-Task(swarm-worker-opus, "Implement task 1.2 per .swarm/fix-ts.md", run_in_background: true)
-→ Returns: agentId: "worker-2-ghi789"
-Task(swarm-worker-opus, "Implement task 1.3 per .swarm/fix-ts.md", run_in_background: true)
-→ Returns: agentId: "worker-3-jkl012"
+# Workers implement IN PARALLEL - FIRE AND FORGET
+Task(swarm-worker-haiku, "Task 1.1: {desc}. Plan: fix-ts. Report to: .swarm/reports/fix-ts/wave-1/task-1.1.md", run_in_background: true)
+→ Store agentId: "worker-1-def456"
+Task(swarm-worker-opus, "Task 1.2: {desc}. Plan: fix-ts. Report to: .swarm/reports/fix-ts/wave-1/task-1.2.md", run_in_background: true)
+→ Store agentId: "worker-2-ghi789"
+Task(swarm-worker-opus, "Task 1.3: {desc}. Plan: fix-ts. Report to: .swarm/reports/fix-ts/wave-1/task-1.3.md", run_in_background: true)
+→ Store agentId: "worker-3-jkl012"
 
-# Process results incrementally as they complete
-AgentOutputTool(agentId: "worker-1-def456", block: false)
-→ "running" → check another worker or update plan
-→ "completed" → process result, update plan, check next
+# DO NOT POLL. Wait for ALL at end of wave (single blocking call on last agent)
+TaskOutput(task_id: "worker-3-jkl012", block: true)
+→ All workers done. You DON'T read their outputs.
 
-# When you need all workers done (before next wave), use block: true
-AgentOutputTool(agentId: "worker-3-jkl012", block: true)
-→ Waits until worker-3 completes
+# Update plan with file paths only (from your stored mapping)
+Edit(".swarm/fix-ts.md", mark tasks completed with report paths)
+
+# Spawn MANDATORY wave review (ultrathink reads ALL reports)
+Task(swarm-reviewer-ultrathink, "Review wave 1. Reports: .swarm/reports/fix-ts/wave-1/", run_in_background: true)
 ```
 
-**If an agent returns a detailed report INTO your context, you used it wrong.**
+**NEVER:**
+- Poll workers with `block: false`
+- Read worker output content
+- Store worker summaries in your context
 
 ## Startup Flow
 
@@ -136,175 +147,172 @@ Default → Wave-by-wave with full checkpoints
 5. Optionally: spawn quick Auditor to validate completed work
 6. Continue execution
 
-## Execution Loop
+## Execution Loop (Zero-Polling)
 
 ```
 For each wave:
   1. Update plan: wave status → in_progress
   2. Identify parallel tasks (no inter-wave deps)
-  3. SPAWN all workers with run_in_background: true (get agentIds)
-  4. POLL/WAIT loop for results:
-     a. AgentOutputTool(agentId, block: false) for each active worker
-     b. If "completed" → process result, update plan, mark task done
-     c. If "running" → continue polling others
-     d. If all workers done OR critical failure → exit loop
-  5. Handle failures (see Escalation) - can escalate while others still running
-  6. SPAWN auditor agents with run_in_background: true
-  7. POLL/WAIT for audit results (same pattern as step 4)
-  8. SPAWN Fixer agents for trivial issues (background)
-  9. POLL/WAIT for fixer results
-  10. Update plan: audit results
-  11. Check if checkpoint → pause for user
-  12. Update plan: wave status → completed
-  13. Proceed to next wave
+  3. SPAWN all workers with run_in_background: true
+     - Store agentId → taskId mapping (do NOT store output)
+     - Include report path in prompt: ".swarm/reports/{plan}/wave-{N}/task-{ID}.md"
+  4. WAIT for ALL workers (single blocking call on last agentId)
+     - TaskOutput(last_agentId, block: true)
+     - Do NOT read the output content
+  5. Update plan: mark all tasks completed with report paths
+  6. SPAWN MANDATORY wave review (swarm-reviewer-ultrathink)
+     - Reads all reports in ".swarm/reports/{plan}/wave-{N}/"
+     - Returns: review priority (LOW/MED/HIGH) + fixes needed
+  7. WAIT for review
+  8. Process review result:
+     - HIGH: spawn fixers immediately, wait, re-review
+     - MED: note in plan, continue (fix at end of swarm or next wave)
+     - LOW: proceed to next wave
+  9. Optional: spawn task-specific review (swarm-reviewer-opus) for complex tasks
+  10. Check if checkpoint → pause for user
+  11. Update plan: wave status → completed
+  12. Proceed to next wave
 ```
 
-### Background Agent Lifecycle
+### Background Agent Lifecycle (Fire-and-Forget)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ SPAWN PHASE (instant, non-blocking)                             │
 │                                                                 │
-│   Task(worker-1, run_in_background: true) → agentId-1           │
-│   Task(worker-2, run_in_background: true) → agentId-2           │
-│   Task(worker-3, run_in_background: true) → agentId-3           │
+│   Task(worker-1, "...report to .swarm/reports/plan/wave-1/task-1.1.md", run_in_background: true) → agentId-1
+│   Task(worker-2, "...report to .swarm/reports/plan/wave-1/task-1.2.md", run_in_background: true) → agentId-2
+│   Task(worker-3, "...report to .swarm/reports/plan/wave-1/task-1.3.md", run_in_background: true) → agentId-3
 │                                                                 │
-│   Store agentIds: {task-1.1: agentId-1, task-1.2: agentId-2...} │
+│   Store ONLY mapping: {task-1.1: agentId-1, ...}                │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ POLL PHASE (incremental processing)                             │
+│ WAIT PHASE (end of wave only, NO POLLING)                       │
 │                                                                 │
-│   pendingAgents = [agentId-1, agentId-2, agentId-3]            │
-│   while pendingAgents.length > 0:                               │
-│     for agentId in pendingAgents:                               │
-│       result = AgentOutputTool(agentId, block: false)           │
-│       if result.status == "completed":                          │
-│         processResult(result)                                   │
-│         updatePlan(taskId, "completed")                         │
-│         pendingAgents.remove(agentId)                           │
-│       elif result.status == "failed":                           │
-│         handleFailure(agentId, result)                          │
-│         pendingAgents.remove(agentId)                           │
-│       # "running" → keep in pending, check next                 │
+│   # Block on last agent (all others complete before it)         │
+│   TaskOutput(agentId-3, block: true)                            │
+│   # Ignore output content - workers wrote to files              │
 │                                                                 │
-│   # Or use block: true on last agent when you need ALL done:    │
-│   AgentOutputTool(lastAgentId, block: true)                     │
+│   # Update plan with file paths (not content!)                  │
+│   Edit(".swarm/plan.md", mark tasks done with report paths)     │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ MANDATORY REVIEW PHASE (ultrathink reads files)                 │
+│                                                                 │
+│   Task(swarm-reviewer-ultrathink,                               │
+│        "Review wave 1. Reports: .swarm/reports/plan/wave-1/",   │
+│        run_in_background: true) → reviewId                      │
+│   TaskOutput(reviewId, block: true)                             │
+│   # Review returns: priority|action|summary-path                │
+│   # HIGH → fix now, MED → defer, LOW → proceed                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### When to use block: true vs block: false
+### TaskOutput Usage (Zero-Polling)
 
-| Situation | Use |
-|-----------|-----|
-| Checking if any worker is done | `block: false` |
-| Updating plan while workers run | `block: false` |
-| Need result before next step | `block: true` |
-| All workers must finish before wave ends | `block: true` on last pending |
-| Architect must finish before workers start | `block: true` |
+**ALWAYS use `block: true`** - no polling allowed:
 
-## Delegation Patterns
+| Situation | Action |
+|-----------|--------|
+| End of wave | `TaskOutput(last_agentId, block: true)` |
+| Architect must finish | `TaskOutput(architect_id, block: true)` |
+| Review must finish | `TaskOutput(review_id, block: true)` |
 
-### Spawning Architect (Background)
+**NEVER use `block: false`** - it wastes context on partial status checks.
+
+## Delegation Patterns (File-Based Communication)
+
+### Spawning Architect
 
 ```typescript
-// ALWAYS use run_in_background: true for architects
 Task({
   subagent_type: "swarm-worker-opus",
-  run_in_background: true,  // ← MANDATORY
+  run_in_background: true,
   prompt: `
     **Role**: Swarm Architect
     **Task**: Create execution plan for: {task description}
-
-    **Requirements**:
-    - Decompose into waves (parallel where possible)
-    - Map dependencies between tasks
-    - Assign models (haiku/opus/opus-ultrathink)
-    - Suggest checkpoints for user review
-    - Use plan format from references/plan-format.md
-
-    **Context**:
-    {relevant codebase context}
-
-    **Output**: Complete plan in markdown format
+    **Output**: Write plan to .swarm/{plan-slug}-inprogress.md
   `
 })
 // Returns: agentId immediately
 
-// Then wait for architect to complete:
-AgentOutputTool({ agentId: architectAgentId, block: true })
+// Wait for architect, ignore output content
+TaskOutput({ task_id: architectAgentId, block: true })
+// Read plan file (the only thing you care about)
+Read(".swarm/{plan-slug}-inprogress.md")
 ```
 
-### Spawning Workers (Background, Parallel)
+### Spawning Workers (Fire-and-Forget)
 
-Launch ALL independent tasks with `run_in_background: true` in a single message:
+Launch ALL workers in single message. Include report path in prompt:
 
 ```typescript
-// CORRECT - single message, multiple background Task calls
-// All spawn instantly, run in parallel, return agentIds
-
+// SINGLE MESSAGE - all workers spawn in parallel
 Task({
   subagent_type: "swarm-worker-haiku",
   run_in_background: true,
-  prompt: "Task 1.1: {description}"
-})  // → Returns: {agentId: "worker-1-abc"}
-
-Task({
-  subagent_type: "swarm-worker-haiku",
-  run_in_background: true,
-  prompt: "Task 1.2: {description}"
-})  // → Returns: {agentId: "worker-2-def"}
+  prompt: "Task 1.1: {desc}. Plan: {slug}. Report: .swarm/reports/{slug}/wave-1/task-1.1.md"
+})  // Store: {"1.1": agentId}
 
 Task({
   subagent_type: "swarm-worker-opus",
   run_in_background: true,
-  prompt: "Task 1.3: {description}"
-})  // → Returns: {agentId: "worker-3-ghi"}
+  prompt: "Task 1.2: {desc}. Plan: {slug}. Report: .swarm/reports/{slug}/wave-1/task-1.2.md"
+})  // Store: {"1.2": agentId}
 
-// Store agentIds mapped to task IDs for later retrieval:
-// agentMap = {"1.1": "worker-1-abc", "1.2": "worker-2-def", "1.3": "worker-3-ghi"}
+// DO NOT POLL. Workers write to files. You track file paths.
 ```
 
-### Collecting Worker Results (Incremental)
+### End of Wave (Single Blocking Call)
 
 ```typescript
-// Poll for results while workers run:
-for (const [taskId, agentId] of Object.entries(agentMap)) {
-  const result = AgentOutputTool({ agentId, block: false });
+// Wait for last worker only (others are done by then)
+TaskOutput({ task_id: lastAgentId, block: true })
+// Ignore output - all details are in report files
 
-  if (result.status === "completed") {
-    updatePlan(taskId, "completed", result.output);
-    delete agentMap[taskId];
-  }
-  // "running" → leave in map, check next iteration
-}
-
-// When only one worker remains and you need to wait:
-const lastAgentId = Object.values(agentMap)[0];
-const finalResult = AgentOutputTool({ agentId: lastAgentId, block: true });
+// Update plan with file paths (NOT content)
+Edit(".swarm/plan.md", `
+- [x] 1.1 → .swarm/reports/{slug}/wave-1/task-1.1.md
+- [x] 1.2 → .swarm/reports/{slug}/wave-1/task-1.2.md
+`)
 ```
 
-### Spawning Auditors (Background, Parallel)
-
-After wave completion, launch auditors IN BACKGROUND:
+### MANDATORY Wave Review (Ultrathink)
 
 ```typescript
-// AI auditors in parallel (background)
+// After EVERY wave - ultrathink reviews ALL task reports
 Task({
-  subagent_type: "swarm-worker-haiku",
+  subagent_type: "swarm-reviewer-ultrathink",
   run_in_background: true,
-  prompt: "Audit: Check code style and conventions for files: {list}"
-})  // → Returns: {agentId: "auditor-1-xyz"}
+  prompt: `
+    Review wave 1 implementation.
+    Reports: .swarm/reports/{slug}/wave-1/
+    Return: {priority}|{action}|{review-path}
+    Priority: HIGH (fix now) | MED (defer) | LOW (proceed)
+  `
+})
 
+TaskOutput({ task_id: reviewId, block: true })
+// Process priority: HIGH→fix, MED→note, LOW→continue
+```
+
+### Optional Task Review (Opus)
+
+For complex individual tasks, spawn scoped review:
+
+```typescript
 Task({
-  subagent_type: "swarm-worker-haiku",
+  subagent_type: "swarm-reviewer-opus",
   run_in_background: true,
-  prompt: "Audit: Check for type safety issues (any, unknown, casts)"
-})  // → Returns: {agentId: "auditor-2-uvw"}
-
-// Wait for all auditors:
-AgentOutputTool({ agentId: "auditor-1-xyz", block: true })
-AgentOutputTool({ agentId: "auditor-2-uvw", block: true })
+  prompt: `
+    Review task 2.3 implementation.
+    Report: .swarm/reports/{slug}/wave-2/task-2.3.md
+    Scope: ONLY this task's code changes
+    Return: {priority}|{action}|{review-path}
+  `
+})
 ```
 
 ## Checkpoint Handling
@@ -362,9 +370,16 @@ When resuming:
 
 4. **Continue execution loop**
 
-## Context Management
+## Context Management (Ultra-Lean)
 
-**Your context budget: ~20k tokens for coordination. Agents get 200k each for work.**
+**Your context budget: ~5-10k tokens for coordination. Agents get 200k each for work.**
+
+### Communication Flow
+
+```
+Workers → Write reports to files → Review agents read files → Return priority to you
+         (you never read)                                    (minimal output)
+```
 
 ### What Goes WHERE
 
@@ -372,50 +387,46 @@ When resuming:
 |-----------|-------------|-----|
 | Run `tsc --noEmit` | **Worker agent** | You cannot run Bash |
 | Read source files | **Worker agent** | You can only read `.swarm/**` |
-| Explore codebase | **Worker agent** | Heavy search, their context |
+| Read task reports | **Review agents** | Not you - zero context waste |
 | Implement a feature | **Worker agent** | Heavy work, their context |
 | Read/write plan files | **Orchestrator** | `.swarm/**` only |
-| Track agent IDs | **Orchestrator** | Map task IDs ↔ agent IDs |
-| Retrieve agent results | **Orchestrator** | Via AgentOutputTool |
+| Track agent IDs → paths | **Orchestrator** | Map task IDs ↔ report paths |
 
 ### DO (Orchestrator)
 - Spawn workers with `run_in_background: true`
-- Track agentIds mapped to task IDs
-- Use `AgentOutputTool(block: false)` for polling
-- Use `AgentOutputTool(block: true)` when you must wait
-- Read/write/edit `.swarm/**` plan files only
-- Use `Glob(".swarm/**")` to find plan files
-- Read `.swarm/reports/task-{ID}.md` for task details
+- Include report path in every worker prompt
+- Store mapping: taskId → reportPath (NOT output content)
+- Use `TaskOutput(block: true)` at end of wave only
+- Ignore TaskOutput content - files have details
+- Spawn review agents to read reports
 
 ### DON'T (Orchestrator)
-- Read source files (you physically cannot - not in allowed-tools)
-- Run Bash commands (you physically cannot)
-- Expect detailed reports from agents (they return brief summaries)
-- Store worker outputs in your context
-- Use `block: true` prematurely (wastes time waiting)
+- Read source files (not in allowed-tools)
+- Read worker output content (waste of context)
+- Poll with `block: false` (wastes context)
+- Store any worker details in your context
+- Read report files yourself (reviewers do this)
 
-### On-Demand Detail Retrieval
+### Report Structure (For Review Agents)
 
-Workers write detailed reports to structured paths. You receive only summaries.
+Workers write detailed reports to structured paths. **You never read these - review agents do.**
 
-**Report paths follow this structure**:
+**Report paths**:
 ```
 .swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md
+.swarm/reports/{plan-slug}/wave-{N}/wave-review.md  (ultrathink review)
 ```
 
-Where `{plan-slug}` is the plan filename without status suffix.
+**Review agent reads reports, you read ONLY the review summary**:
+```
+# Review agent output (what you receive):
+HIGH|fix-imports|.swarm/reports/{slug}/wave-1/wave-review.md
 
-**Example**: For plan `fix-auth-service-tokens-inprogress.md`, task 2.3:
+# You DON'T read the review file - just act on priority
+if HIGH → spawn fixers
+if MED → note in plan, continue
+if LOW → continue
 ```
-Read(".swarm/reports/fix-auth-service-tokens/wave-2/task-2.3.md")
-```
-
-**Finding all reports for a swarm**:
-```
-Glob(".swarm/reports/fix-auth-service-tokens/**/*.md")
-```
-
-This keeps your context lean while preserving full detail when needed.
 
 ## Error Recovery
 
@@ -443,71 +454,37 @@ Update the plan file at these moments:
 
 Always use atomic writes - read, modify, write complete file.
 
-## AgentOutputTool Reference
+## TaskOutput Reference (Zero-Polling)
 
-The key tool for managing background agents.
+The ONLY tool for agent completion - use `block: true` exclusively.
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `agentId` | string | required | The agent ID returned from Task with `run_in_background: true` |
-| `block` | boolean | true | If true, waits for agent to complete. If false, returns immediately with status |
-| `wait_up_to` | number | 150 | Max seconds to wait when blocking (max 300) |
+| `task_id` | string | required | The agent ID from Task with `run_in_background: true` |
+| `block` | boolean | true | ALWAYS use true - no polling |
+| `timeout` | number | 30000 | Max ms to wait (up to 600000) |
 
 ### Return Values
 
-When `block: false` (immediate check):
-```typescript
-{
-  status: "running" | "completed" | "failed",
-  output?: string  // Only if completed
-}
-```
-
-When `block: true` (wait until done):
 ```typescript
 {
   status: "completed" | "failed" | "timeout",
-  output?: string  // Agent's final message
+  output?: string  // IGNORE THIS - all details in files
 }
 ```
 
-### Usage Patterns
+### Usage (ONLY Pattern)
 
-**Pattern 1: Fire-and-forget spawn, then poll**
 ```typescript
-// Spawn all workers
-const agents = tasks.map(task =>
-  Task({ subagent_type: "swarm-worker-opus", prompt: task, run_in_background: true })
-);
+// End of wave - wait for all workers
+TaskOutput({ task_id: lastAgentId, block: true })
+// IGNORE output content - workers wrote to report files
 
-// Poll until all done
-while (agents.some(a => a.status === "running")) {
-  for (const agent of agents.filter(a => a.status === "running")) {
-    const result = AgentOutputTool({ agentId: agent.id, block: false });
-    if (result.status !== "running") {
-      agent.status = result.status;
-      agent.output = result.output;
-    }
-  }
-}
+// Review completion
+TaskOutput({ task_id: reviewId, block: true })
+// Read ONLY the priority from output: "HIGH|action|path"
 ```
 
-**Pattern 2: Wait for specific agent**
-```typescript
-// When you MUST have result before continuing:
-const result = AgentOutputTool({ agentId: "critical-agent-id", block: true });
-```
-
-**Pattern 3: Timeout handling**
-```typescript
-const result = AgentOutputTool({
-  agentId: "slow-agent",
-  block: true,
-  wait_up_to: 300  // Max 5 minutes
-});
-if (result.status === "timeout") {
-  // Agent still running, decide: wait more or escalate
-}
-```
+**NEVER use `block: false` - it wastes context on partial checks.**
