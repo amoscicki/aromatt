@@ -49,7 +49,7 @@ Quick subagentic tasks without formal planning. Use when:
 
 **MANDATORY FIRST STEP**: You MUST read the orchestrator protocol before doing ANYTHING:
 ```
-Read(".claude/skills/swarm/references/orchestrator-protocol.md")
+Read("${CLAUDE_PLUGIN_ROOT}/skills/swarm/references/orchestrator-protocol.md")
 ```
 
 **CRITICAL**: Orchestrator does COORDINATION ONLY. You cannot read source files or run commands.
@@ -162,18 +162,18 @@ Plans are stored in `.swarm/{descriptive-task-summary}-{status}.md`
 ## Skill Reference
 
 For detailed protocols, see skill: `swarm`
-- [orchestrator-protocol.md](../.claude/skills/swarm/references/orchestrator-protocol.md)
-- [architect-protocol.md](../.claude/skills/swarm/references/architect-protocol.md)
-- [worker-protocol.md](../.claude/skills/swarm/references/worker-protocol.md)
-- [auditor-protocol.md](../.claude/skills/swarm/references/auditor-protocol.md)
-- [plan-format.md](../.claude/skills/swarm/references/plan-format.md)
-- [escalation-rules.md](../.claude/skills/swarm/references/escalation-rules.md)
+- [orchestrator-protocol.md](../skills/swarm/references/orchestrator-protocol.md)
+- [architect-protocol.md](../skills/swarm/references/architect-protocol.md)
+- [worker-protocol.md](../skills/swarm/references/worker-protocol.md)
+- [auditor-protocol.md](../skills/swarm/references/auditor-protocol.md)
+- [plan-format.md](../skills/swarm/references/plan-format.md)
+- [escalation-rules.md](../skills/swarm/references/escalation-rules.md)
 
 ## Now Execute
 
 **Step 0 (MANDATORY)**: Read the orchestrator protocol FIRST:
 ```
-Read(".claude/skills/swarm/references/orchestrator-protocol.md")
+Read("${CLAUDE_PLUGIN_ROOT}/skills/swarm/references/orchestrator-protocol.md")
 ```
 
 Then proceed:

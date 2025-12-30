@@ -5,11 +5,8 @@
   "author": {
     "name": "Arkadiusz Moscicki"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/amoscicki/dotfiles"
-  },
+  "repository": "https://github.com/amoscicki/aromatt",
   "commands": "./commands",
   "skills": "./skills",
-  "agents": "./agents"
+  "agents": "./agents/*.md"
 }
