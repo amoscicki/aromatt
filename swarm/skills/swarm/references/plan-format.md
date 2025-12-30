@@ -32,10 +32,11 @@ User-confirmed pause points:
 | 1.1 | {name} | haiku | [ ] | - | {what to do} |
 | 1.2 | {name} | opus | [ ] | 1.1 | {what to do} |
 
-### Wave 1 Audit
-- [ ] Tools: biome, tsc
-- [ ] AI: style, types, conventions
-- [ ] Issues: {count} found, {count} fixed
+### Wave 1 Review (MANDATORY)
+- [ ] AI Review: swarm-reviewer-ultrathink
+- [ ] Priority: pending | LOW | MED | HIGH
+- [ ] Report: `.swarm/reports/{slug}/wave-1/wave-review.md`
+- [ ] Issues: {count} HIGH, {count} MED, {count} LOW
 
 ---
 
@@ -46,6 +47,12 @@ User-confirmed pause points:
 | ID | Task | Model | Status | Deps | Description |
 |----|------|-------|--------|------|-------------|
 | 2.1 | {name} | haiku | [ ] | 1.2 | {what to do} |
+
+### Wave 2 Review (MANDATORY)
+- [ ] AI Review: swarm-reviewer-ultrathink
+- [ ] Priority: pending | LOW | MED | HIGH
+- [ ] Report: `.swarm/reports/{slug}/wave-2/wave-review.md`
+- [ ] Issues: {count} HIGH, {count} MED, {count} LOW
 
 ...
 
@@ -132,11 +139,39 @@ For simple swarms, use this minimal format:
 |----|------|-------|--------|-------------|
 | 1.1 | {name} | haiku | [ ] | {what} |
 
+### Wave 1 Review (MANDATORY)
+- [ ] AI Review: swarm-reviewer-ultrathink
+- [ ] Priority: pending
+- [ ] Report: `.swarm/reports/{slug}/wave-1/wave-review.md`
+
 ---
 
 ## Execution Log
 (auto-populated during execution)
 ```
+
+## CRITICAL: Architect Instructions
+
+**EVERY wave MUST include a Review section.** This is NON-NEGOTIABLE.
+
+When creating a plan, the Architect MUST:
+
+1. **Add Review section to EVERY wave** - no exceptions
+2. **Use exact format**:
+   ```markdown
+   ### Wave {N} Review (MANDATORY)
+   - [ ] AI Review: swarm-reviewer-ultrathink
+   - [ ] Priority: pending
+   - [ ] Report: `.swarm/reports/{slug}/wave-{N}/wave-review.md`
+   ```
+3. **Never skip reviews** - even for single-task waves
+4. **Plan assumes review** - task estimates don't include review time
+
+**Why this matters**:
+- Orchestrator spawns `swarm-reviewer-ultrathink` after EVERY wave
+- Review catches cross-cutting issues before they propagate
+- HIGH priority issues get fixed immediately, not at end of swarm
+- MED/LOW issues are noted but don't block progress
 
 ## Adaptive Extensions
 
@@ -204,12 +239,12 @@ Reports are organized hierarchically per swarm plan and wave:
 │   │   ├── architect.md                 # Architect's planning report
 │   │   ├── wave-0/                      # Wave 0 (if exists)
 │   │   │   ├── task-0.1.md              # Task reports
-│   │   │   └── audit.md                 # Wave audit report
+│   │   │   └── wave-review.md           # Wave review (MANDATORY)
 │   │   ├── wave-1/
 │   │   │   ├── task-1.1.md
 │   │   │   ├── task-1.2.md
 │   │   │   ├── task-1.3.md
-│   │   │   └── audit.md
+│   │   │   └── wave-review.md
 │   │   ├── wave-2/
 │   │   │   └── ...
 │   │   └── summary.md                   # Final swarm summary
@@ -232,7 +267,7 @@ Reports are organized hierarchically per swarm plan and wave:
 | **Reports** | |
 | Architect | `.swarm/reports/{plan-slug}/architect.md` |
 | Task | `.swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md` |
-| Wave Audit | `.swarm/reports/{plan-slug}/wave-{N}/audit.md` |
+| Wave Review | `.swarm/reports/{plan-slug}/wave-{N}/wave-review.md` |
 | Final Summary | `.swarm/reports/{plan-slug}/summary.md` |
 | **Reference Docs** | |
 | Architecture | `.swarm/refs/{plan-slug}/architecture.md` |

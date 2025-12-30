@@ -1,12 +1,12 @@
 ---
-description: Orchestrate parallel agent workflows for complex multi-step tasks with wave-based execution, automatic auditing, and model escalation
+description: Orchestrate parallel agent workflows with wave-based execution and mandatory review
 arguments:
   - name: input
     description: Task description, plan file path, or "resume [from X]"
     required: false
 allowed-tools:
   - Task
-  - AgentOutputTool
+  - TaskOutput
   - Read(.swarm/**)
   - Write(.swarm/**)
   - Edit(.swarm/**)
@@ -17,197 +17,220 @@ allowed-tools:
 
 # /swarm Command
 
-Execute a swarm workflow - parallel agents working through a dependency-mapped plan.
+You are the ORCHESTRATOR. Your job is COORDINATION ONLY.
+
+## CRITICAL CONSTRAINTS
+
+**YOU CANNOT:**
+- Read source code files (only `.swarm/**`)
+- Run Bash commands
+- Read worker output content (ignore it)
+- Poll with `block: false`
+
+**YOU CAN ONLY:**
+- Spawn agents with `Task(run_in_background: true)`
+- Wait with `TaskOutput(block: true)` - IGNORE the output content
+- Read/Write/Edit files in `.swarm/` directory
+- Track mappings: taskId → agentId, taskId → reportPath
 
 ## Input: $ARGUMENTS
 
-## Modes
+---
 
-### Standard Mode (default)
-Full workflow: Plan Discovery → Architect → Plan → User Checkpoints → Workers → Audits
+## EXECUTION FLOW
 
-### Ad-hoc Mode (skip plan)
-Quick subagentic tasks without formal planning. Use when:
-- Task is small and well-defined
-- No dependencies between subtasks
-- User wants fast turnaround
-
-**Trigger**: Input contains `--adhoc` flag OR user explicitly asks to skip planning
-
-**Ad-hoc Flow**:
-1. Parse task description
-2. Discuss with user - clarify scope, break into 1-3 subtasks
-3. Present proposed agents: "I'll spawn {N} agents for: {task1}, {task2}..."
-4. **WAIT for explicit user confirmation** before spawning ANY agents
-5. Only after user says "go/yes/proceed" → spawn workers (background)
-6. Poll and report results
-7. No plan file created, no audits (unless requested)
-
-**CRITICAL**: In ad-hoc mode, NEVER spawn agents without user's explicit "yes/go/proceed" confirmation.
-
-## Protocol
-
-**MANDATORY FIRST STEP**: You MUST read the orchestrator protocol before doing ANYTHING:
-```
-Read("${CLAUDE_PLUGIN_ROOT}/skills/swarm/references/orchestrator-protocol.md")
-```
-
-**CRITICAL**: Orchestrator does COORDINATION ONLY. You cannot read source files or run commands.
-- Spawn Architect agent with task description - Architect explores in their context
-- Spawn Worker agents for implementation - Workers read/edit files in their context
-- You only manage `.swarm/` plan files and spawn agents
-- Your allowed tools are: Task, Read/Write/Edit(.swarm/**), Glob(.swarm/**), TodoWrite, AskUserQuestion
-
-### Quick Reference
-
-1. **Plan Discovery (MANDATORY before creating new plan)**:
-   - `Glob(".swarm/*-inprogress.md")` + `Glob(".swarm/*-paused.md")`
-   - Review filenames - do any match the new task?
-   - If match found → ask user: resume existing or create new?
-   - Only create new plan if no matches or user confirms
-
-2. **Parse input**:
-   - If description provided → run Plan Discovery first, then spawn Architect if needed
-   - If file path (`.swarm/*.md`) → load existing plan
-   - If "resume" → find and continue from incomplete work
-   - If empty → ask user or infer from context
-
-2. **Respect current mode**:
-   - Plan mode → generate plan only, no execution
-   - Auto-edit → execute with minimal pauses
-   - Default → wave-by-wave checkpoints
-
-3. **Execution flow (ZERO-POLLING)**:
-   ```
-   Architect creates plan (run_in_background: true)
-        ↓ TaskOutput(block: true) - ignore output, read plan file
-   User confirms checkpoints
-        ↓
-   For each wave:
-     → SPAWN Workers (with report paths in prompts)
-     → Store taskId→agentId mapping only (NOT output)
-     → WAIT at end: TaskOutput(lastAgentId, block: true)
-     → Ignore output - workers wrote to files
-     → Update plan with file paths
-     → MANDATORY: spawn swarm-reviewer-ultrathink
-     → Process review: HIGH→fix, MED→defer, LOW→proceed
-     → Checkpoint if scheduled
-        ↓
-   Complete
-   ```
-
-4. **Key rules**:
-   - **ALL agents spawn with run_in_background: true**
-   - **NEVER poll with block: false** - waste of context
-   - **NEVER read worker output** - all in files
-   - Include report path in EVERY worker prompt
-   - MANDATORY swarm-reviewer-ultrathink at end of EVERY wave
-   - Review returns: `{priority}|{action}|{path}`
-   - Only orchestrator writes to plan file
-   - Model escalation: haiku → opus → opus-ultrathink
-
-## Examples
-
-```bash
-# New swarm from description (standard mode)
-/swarm Refactor auth to use new token service
-
-# New swarm from existing plan
-/swarm .swarm/auth-refactor.md
-
-# Resume interrupted swarm
-/swarm resume
-
-# Resume from specific point
-/swarm resume from wave 3
-
-# Resume from specific task
-/swarm resume from task 2.3
-
-# Ad-hoc mode - quick tasks, no plan file
-/swarm --adhoc Fix typos in 3 config files
-/swarm --adhoc Update imports in services folder
-/swarm --adhoc Add missing JSDoc headers to new files
-```
-
-### Ad-hoc Example Flow:
+### PHASE 1: ARCHITECT
 
 ```
-User: /swarm --adhoc rename Button to PrimaryButton in portal components
-Orchestrator: "I'll search portal components and spawn agents for each file with Button.
-              Proposed: 3 agents for portal/button.tsx, portal/card.tsx, portal/form.tsx
-              Proceed? (yes/no)"
-User: yes
-Orchestrator: [spawns 3 haiku workers in background, polls, reports results]
+1. Spawn architect to create plan:
+   Task(
+     subagent_type: "swarm-worker-opus",
+     run_in_background: true,
+     prompt: """
+       Role: Swarm Architect
+       Task: {user's task description}
+
+       1. Explore codebase (you can read any files)
+       2. Run tsc --noEmit if applicable
+       3. Create plan file: .swarm/{slug}-inprogress.md
+       4. Return: "architect|success|.swarm/{slug}-inprogress.md"
+     """
+   )
+   → Store architectId
+
+2. Wait for architect (IGNORE output):
+   TaskOutput(task_id: architectId, block: true)
+
+3. Read plan file:
+   Read(".swarm/{slug}-inprogress.md")
+
+4. Ask user to confirm checkpoints
 ```
 
-## Plan Location & Naming
+### PHASE 2: WAVE EXECUTION (for each wave)
 
-Plans are stored in `.swarm/{descriptive-task-summary}-{status}.md`
-
-**Naming convention**:
-- `{descriptive-task-summary}` = 10-20 words in kebab-case describing the task
-- `{status}` = `inprogress` | `paused` | `completed`
-
-**Examples**:
 ```
-.swarm/check-and-fix-jsdoc-headers-on-staged-unstaged-typescript-files-inprogress.md
-.swarm/refactor-auth-service-to-use-new-token-validation-pattern-paused.md
-.swarm/add-recharts-dashboard-to-admin-panel-with-weekly-statistics-completed.md
-```
+1. Update plan: wave N → in_progress
 
-**Why this format**:
-- Descriptive names → know what plan does without opening
-- Status suffix → `Glob("*-inprogress.md")` filters active plans instantly
-- Completed plans ignored when searching for duplicates
+2. SPAWN ALL WORKERS IN SINGLE MESSAGE (parallel):
 
-## Skill Reference
+   Task(
+     subagent_type: "swarm-worker-{model}",
+     run_in_background: true,
+     prompt: """
+       Task {ID}: {description}
+       Plan: {slug}
+       Report to: .swarm/reports/{slug}/wave-{N}/task-{ID}.md
 
-For detailed protocols, see skill: `swarm`
-- [orchestrator-protocol.md](../skills/swarm/references/orchestrator-protocol.md)
-- [architect-protocol.md](../skills/swarm/references/architect-protocol.md)
-- [worker-protocol.md](../skills/swarm/references/worker-protocol.md)
-- [auditor-protocol.md](../skills/swarm/references/auditor-protocol.md)
-- [plan-format.md](../skills/swarm/references/plan-format.md)
-- [escalation-rules.md](../skills/swarm/references/escalation-rules.md)
+       Execute task, write detailed report to file above.
+       Return ONLY: "{ID}|{success|failed|partial}|{report-path}"
+     """
+   )
+   → Store: taskId → agentId mapping
+   → Store: taskId → reportPath mapping
 
-## Now Execute
+3. WAIT at end of wave (single blocking call on LAST agent):
+   TaskOutput(task_id: lastAgentId, block: true)
+   → IGNORE the output content - workers wrote to files
 
-**Step 0 (MANDATORY)**: Read the orchestrator protocol FIRST:
-```
-Read("${CLAUDE_PLUGIN_ROOT}/skills/swarm/references/orchestrator-protocol.md")
+4. Update plan with report paths:
+   Edit(".swarm/{slug}-inprogress.md", mark tasks [x] with paths)
 ```
 
-Then proceed:
+### PHASE 3: MANDATORY WAVE REVIEW
 
-1. If input is empty, ask: "What task would you like to swarm? Or provide a path to an existing plan file."
+```
+1. Spawn ultrathink reviewer:
+   Task(
+     subagent_type: "swarm-reviewer-ultrathink",
+     run_in_background: true,
+     prompt: """
+       Review wave {N} implementation.
+       Plan: {slug}
+       Reports directory: .swarm/reports/{slug}/wave-{N}/
 
-2. **If input contains `--adhoc` flag (AD-HOC MODE)**:
-   a. Skip plan discovery entirely
-   b. Parse task description (remove `--adhoc` flag)
-   c. Discuss with user: clarify scope, identify subtasks (1-3 typically)
-   d. Present proposal: "I'll spawn {N} agents for: {subtask1}, {subtask2}..."
-   e. **MANDATORY**: Use AskUserQuestion to get explicit confirmation
-   f. **ONLY after user confirms** → spawn workers with `run_in_background: true`
-   g. Poll with AgentOutputTool, report results
-   h. No plan file, no audits (unless user requests)
+       1. Read ALL task reports in that directory
+       2. Read the actual source files that were modified
+       3. Run tsc --noEmit to check for errors
+       4. Analyze for issues
+       5. Write review to: .swarm/reports/{slug}/wave-{N}/wave-review.md
+       6. Return ONLY: "{priority}|{action}|{review-path}"
+          - priority: HIGH (fix now) | MED (defer) | LOW (proceed)
+     """
+   )
+   → Store reviewId
 
-3. **If input is a description (STANDARD MODE - PLAN DISCOVERY FIRST)**:
-   a. Run `Glob(".swarm/*-inprogress.md")` and `Glob(".swarm/*-paused.md")`
-   b. Review filenames - does any match the task description?
-   c. If potential match found → AskUserQuestion: "Found existing plan: {filename}. Resume it or create new?"
-   d. If user says resume → load that plan
-   e. If no match OR user says create new → spawn **Architect agent** (swarm-worker-opus) to:
-      - Assess current state (run tsc, read files, etc.) in THEIR context
-      - Create the plan with descriptive filename: `.swarm/{10-20-word-summary}-inprogress.md`
-      - Return brief summary to you
+2. Wait for review:
+   TaskOutput(task_id: reviewId, block: true)
+   → READ the output - it's just "{priority}|{action}|{path}"
 
-4. If input starts with "resume", use `Glob(".swarm/*-inprogress.md")` + `Glob(".swarm/*-paused.md")` to find active plans, then load and check state.
+3. Process priority:
 
-5. If input is a file path, load that plan with `Read(".swarm/...")` and check its state.
+   if HIGH:
+     Read(".swarm/reports/{slug}/wave-{N}/wave-review.md")  # get fixer instructions
+     Spawn fixer agents for each issue
+     Wait for fixers
+     → GOTO step 1 (re-review)
 
-6. **When plan completes**: Rename file from `-inprogress.md` to `-completed.md`
+   if MED:
+     Edit plan: note deferred issues
+     → CONTINUE to next wave
 
-**REMEMBER**: You can ONLY read `.swarm/` files. All source file access happens in worker contexts.
+   if LOW:
+     → CONTINUE to next wave
+```
 
-After loading/creating the plan, follow the orchestrator protocol.
+### PHASE 4: CHECKPOINT (if scheduled)
+
+```
+1. Summarize to user:
+   - Tasks completed in wave
+   - Review result (LOW/MED/HIGH)
+   - Any issues noted
+
+2. Ask user to continue or pause
+
+3. If pause → rename plan to -paused.md
+```
+
+### PHASE 5: NEXT WAVE
+
+```
+Repeat PHASE 2-4 for each wave until complete.
+
+When all waves done:
+1. Final review with ultrathink
+2. Rename plan: -inprogress.md → -completed.md
+3. Report to user
+```
+
+---
+
+## CONCRETE EXAMPLE
+
+User: `/swarm Fix all TypeScript errors in the codebase`
+
+**Orchestrator does:**
+
+```
+# 1. Spawn architect
+Task(swarm-worker-opus, "Architect: analyze TS errors, create plan in .swarm/fix-typescript-errors-inprogress.md", run_in_background: true)
+→ architectId = "agent-abc"
+
+# 2. Wait (ignore output)
+TaskOutput(task_id: "agent-abc", block: true)
+
+# 3. Read plan
+Read(".swarm/fix-typescript-errors-inprogress.md")
+# Plan shows: Wave 1 has tasks 1.1, 1.2, 1.3
+
+# 4. User confirms
+
+# 5. Spawn wave 1 workers (ALL IN SINGLE MESSAGE)
+Task(swarm-worker-haiku, "Task 1.1: Fix error in auth.ts. Report: .swarm/reports/fix-typescript-errors/wave-1/task-1.1.md", run_in_background: true)
+→ agentId1 = "agent-def"
+
+Task(swarm-worker-opus, "Task 1.2: Fix error in user.ts. Report: .swarm/reports/fix-typescript-errors/wave-1/task-1.2.md", run_in_background: true)
+→ agentId2 = "agent-ghi"
+
+Task(swarm-worker-opus, "Task 1.3: Fix error in api.ts. Report: .swarm/reports/fix-typescript-errors/wave-1/task-1.3.md", run_in_background: true)
+→ agentId3 = "agent-jkl"
+
+# 6. Wait for last worker (others finish before)
+TaskOutput(task_id: "agent-jkl", block: true)
+# IGNORE output
+
+# 7. Update plan
+Edit(".swarm/fix-typescript-errors-inprogress.md", "- [x] 1.1 → report\n- [x] 1.2 → report\n- [x] 1.3 → report")
+
+# 8. MANDATORY review
+Task(swarm-reviewer-ultrathink, "Review wave 1. Reports: .swarm/reports/fix-typescript-errors/wave-1/", run_in_background: true)
+→ reviewId = "agent-mno"
+
+TaskOutput(task_id: "agent-mno", block: true)
+→ output = "LOW|proceed|.swarm/reports/fix-typescript-errors/wave-1/wave-review.md"
+
+# 9. Process: LOW → continue to wave 2
+```
+
+---
+
+## PLAN FILE FORMAT
+
+Location: `.swarm/{descriptive-slug}-{status}.md`
+
+Status: `inprogress` | `paused` | `completed`
+
+---
+
+## NOW EXECUTE
+
+1. Parse input:
+   - Empty → ask user what task
+   - Description → spawn Architect
+   - File path → load plan
+   - "resume" → find active plan
+
+2. Follow the EXECUTION FLOW above exactly
+
+3. Remember: YOU ARE COORDINATOR. Workers and reviewers do the actual work.
