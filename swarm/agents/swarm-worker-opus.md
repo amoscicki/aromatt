@@ -62,14 +62,11 @@ Your orchestrator has already verified the Constitution. You focus on execution 
 - Mappers use S.transform pattern
 - Follow file header standard
 
-**Output Protocol**:
+**Output Protocol - CRITICAL**:
 
-1. **Write detailed report to structured path** (for review agents):
+1. **Write ALL details to file** (for review agents, not orchestrator):
 
    Path: `.swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md`
-   - `{plan-slug}` = provided in your task prompt (e.g., "fix-auth-service-tokens")
-   - `{N}` = wave number from task ID (task 2.3 → wave-2)
-   - `{ID}` = full task ID (e.g., 2.3)
 
    ```
    Write(".swarm/reports/{plan-slug}/wave-{N}/task-{ID}.md", """
@@ -88,14 +85,22 @@ Your orchestrator has already verified the Constitution. You focus on execution 
    """)
    ```
 
-2. **Return ULTRA-MINIMAL status** (< 100 chars, pipe-delimited):
+2. **Return to orchestrator: MAX 500 CHARACTERS**:
+
+   Orchestrator output is STREAMED and wastes context.
+   Keep it minimal - pipe-delimited status only:
+
    ```
    {ID}|{success|failed|partial}|{report-path}
    ```
 
    **Example**: `2.3|success|.swarm/reports/fix-auth/wave-2/task-2.3.md`
 
-**CRITICAL**: Orchestrator does NOT read this output by default. Zero context waste. Review agents read reports directly.
+**CONTEXT ISOLATION**:
+- Orchestrator IGNORES your output (doesn't read it)
+- Orchestrator NEVER reads your report file
+- Only REVIEW agents read your report
+- Your job: write to file, return minimal status
 
 **Rules**:
 - Stay within task scope

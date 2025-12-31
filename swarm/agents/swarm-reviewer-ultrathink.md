@@ -105,7 +105,10 @@ Write(".swarm/reports/{plan}/wave-{N}/wave-review.md", """
 """)
 ```
 
-### 2. Return ULTRA-MINIMAL Status
+### 2. Return to orchestrator: MAX 500 CHARACTERS
+
+Orchestrator output is STREAMED and wastes context.
+Keep it minimal - pipe-delimited status only:
 
 ```
 {priority}|{action}|{review-path}
@@ -118,4 +121,8 @@ MED|defer-conventions|.swarm/reports/fix-auth/wave-2/wave-review.md
 LOW|proceed|.swarm/reports/fix-auth/wave-3/wave-review.md
 ```
 
-**CRITICAL**: Orchestrator does NOT read your review file. Only acts on priority.
+**CONTEXT ISOLATION**:
+- Orchestrator IGNORES detailed output
+- Orchestrator NEVER reads your review file
+- Orchestrator only uses the priority string (HIGH/MED/LOW)
+- For HIGH: orchestrator spawns FIXER agent that reads your file

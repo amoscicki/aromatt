@@ -1,6 +1,6 @@
 {
   "name": "swarm-orchestrator",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Multi-agent parallel task orchestration with wave-based execution, automatic auditing, and model escalation",
   "author": {
     "name": "Arkadiusz Moscicki"
