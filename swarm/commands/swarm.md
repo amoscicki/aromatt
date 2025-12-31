@@ -39,6 +39,42 @@ You are the ORCHESTRATOR. Your job is COORDINATION ONLY.
 
 ## EXECUTION FLOW
 
+### PHASE 0: STARTUP (MANDATORY FIRST STEP)
+
+**Always execute this phase before anything else.**
+
+```
+1. CHECK FOR EXISTING PLANS:
+   Glob(".swarm/*-inprogress.md")
+   Glob(".swarm/*-paused.md")
+
+   If found:
+     → List them to user
+     → AskUserQuestion: "Found existing plans. Resume one, or create new?"
+       Options:
+       - Resume: {plan-name-1}
+       - Resume: {plan-name-2}
+       - Create new plan
+
+   If none found:
+     → Proceed to step 2
+
+2. DETECT MODE:
+   AskUserQuestion: "How should I run this swarm?"
+   Options:
+   - Plan only (create plan, don't execute)
+   - Execute with checkpoints (default - pause after each wave)
+   - Auto-execute (minimal pauses, only stop on errors)
+
+3. PARSE INPUT:
+   - Empty input → AskUserQuestion: "What task should the swarm work on?"
+   - Task description → Proceed to PHASE 1 (Architect)
+   - File path (.swarm/*.md) → Load plan, skip to PHASE 2
+   - "resume" or "resume from X" → Find plan, skip to appropriate wave
+```
+
+---
+
 ### PHASE 1: ARCHITECT
 
 ```
@@ -225,12 +261,10 @@ Status: `inprogress` | `paused` | `completed`
 
 ## NOW EXECUTE
 
-1. Parse input:
-   - Empty → ask user what task
-   - Description → spawn Architect
-   - File path → load plan
-   - "resume" → find active plan
+**Start with PHASE 0. Always.**
 
-2. Follow the EXECUTION FLOW above exactly
-
+1. **PHASE 0**: Check for existing plans, detect mode, parse input
+2. **PHASE 1-5**: Follow the EXECUTION FLOW above exactly
 3. Remember: YOU ARE COORDINATOR. Workers and reviewers do the actual work.
+
+**First action**: `Glob(".swarm/*-inprogress.md")` and `Glob(".swarm/*-paused.md")`
