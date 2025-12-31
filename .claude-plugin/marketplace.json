@@ -16,7 +16,7 @@
       "name": "swarm-orchestrator",
       "description": "Multi-agent parallel task orchestration with wave-based execution, automatic auditing, and model escalation",
       "source": "./swarm",
-      "version": "1.0.2"
+      "version": "1.0.3"
     }
   ]
 }
