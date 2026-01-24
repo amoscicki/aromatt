@@ -1,7 +1,7 @@
 ---
 name: Research Methodology
 description: This skill should be used when docs-researcher agent needs guidance on "how to search documentation", "WebSearch query patterns", "filtering search results", "documentation research strategy", or "creating knowledge files". Provides systematic methodology for effective technical documentation research.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Research Methodology for Documentation
@@ -10,11 +10,12 @@ This skill provides systematic approach to researching technical documentation u
 
 ## Core Principles
 
-1. **Validate before research** - Ensure request is specific enough
-2. **Check local first** - Look in `.claude/knowledge/` before searching
-3. **Official sources priority** - Start with official docs
-4. **Filter aggressively** - Extract only what's relevant to context
-5. **Save for reuse** - Document findings in standard format
+1. **Initialize first** - Ensure project knowledge base skill exists
+2. **Validate before research** - Ensure request is specific enough
+3. **Check local first** - Look in `.claude/skills/project-knowledge-base/references/` before searching
+4. **Official sources priority** - Start with official docs
+5. **Filter aggressively** - Extract only what's relevant to context
+6. **Save for reuse** - Document findings in standard format
 
 ## Request Validation
 
@@ -90,7 +91,7 @@ Exclude information that:
 
 ## Document Format
 
-Save all knowledge files to `.claude/knowledge/` using the template in `references/document-template.md`.
+Save all knowledge files to `.claude/skills/project-knowledge-base/references/` using the template in `references/document-template.md`.
 
 ### File Naming
 
@@ -118,10 +119,46 @@ Required fields in YAML frontmatter:
 - `created`: Date in YYYY-MM-DD format
 - `context`: Original problem that triggered research
 
+## Progressive Disclosure
+
+**Threshold: 500 lines**
+
+When a reference file exceeds 500 lines, split into a tree structure:
+
+```
+references/tanstack-router.md  (>500 lines)
+↓ split to
+references/tanstack-router/
+├── _index.md        # Overview + TOC linking to sub-files
+├── route-guards.md
+├── data-loading.md
+└── navigation.md
+```
+
+### When to Split
+
+- Single reference file exceeds 500 lines
+- Topic has clearly distinct sub-topics
+- Different aspects serve different use cases
+
+### Split Structure
+
+1. **_index.md**: Overview, quick reference, TOC with links
+2. **Sub-files**: One file per major sub-topic
+3. **Cross-references**: Link between related sub-files
+
+### SKILL.md Update
+
+After splitting, update SKILL.md index to reference `_index.md`:
+```markdown
+- [tanstack-router](references/tanstack-router/_index.md) - TanStack Router comprehensive guide
+```
+
 ## Quality Checklist
 
 Before saving knowledge document, verify:
 
+- [ ] Project knowledge base skill initialized
 - [ ] Request was properly validated
 - [ ] Existing knowledge was checked first
 - [ ] Official sources were consulted
@@ -130,6 +167,8 @@ Before saving knowledge document, verify:
 - [ ] Sources are cited
 - [ ] File follows naming convention
 - [ ] Frontmatter is complete
+- [ ] SKILL.md index updated
+- [ ] Progressive disclosure applied if >500 lines
 
 ## Additional Resources
 

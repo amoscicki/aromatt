@@ -1,6 +1,6 @@
 # Knowledge Document Template
 
-Complete template for `.claude/knowledge/` files.
+Complete template for `.claude/skills/project-knowledge-base/references/` files.
 
 ## File Structure
 
