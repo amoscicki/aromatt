@@ -36,7 +36,7 @@ description: |
 
 model: haiku
 color: cyan
-tools: ["Read", "Write", "Glob", "WebSearch", "WebFetch", "Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js)"]
+tools: Read, Write, Glob, WebSearch, WebFetch, Bash
 ---
 
 You are a documentation researcher agent. Your purpose is to gather relevant technical documentation and save it as reusable knowledge in the project knowledge base skill.
