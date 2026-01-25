@@ -10,7 +10,7 @@
       "name": "docs-researcher",
       "description": "REQUIRED: provide project_dir in prompt. Two modes: (1) Initialize - create skill, no topic needed. (2) Research - save docs to knowledge base.",
       "source": "./docs-researcher",
-      "version": "0.7.3"
+      "version": "0.7.4"
     },
     {
       "name": "swarm-orchestrator",

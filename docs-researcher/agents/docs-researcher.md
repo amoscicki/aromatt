@@ -208,7 +208,7 @@ If you cannot find good documentation, you STILL write a file documenting:
    - Read project CLAUDE.md (if exists)
    - Append knowledge base section if missing (see Step 0.5)
    - Check for `.claude/knowledge/` → migrate if exists (see Migration section)
-3. If exists → proceed to Step 1
+3. If exists → proceed to Step 1 (Read Project Context)
 
 ### Step 0.5: Update Project CLAUDE.md (if needed)
 
@@ -222,7 +222,27 @@ Ten projekt używa `.claude/skills/project-knowledge-base/`.
 Przed kodowaniem zapoznaj się ze skillem.
 ```
 
-### Step 1: Validate Request
+### Step 1: Read Project Context
+
+**BEFORE researching, understand the project:**
+
+1. Read `.claude/CLAUDE.md` (if exists) for:
+   - Project rules and conventions
+   - Preferred patterns or libraries
+   - Version requirements
+   - Any restrictions or guidelines
+
+2. Read `package.json` (if exists) for:
+   - Exact versions of dependencies
+   - Which libraries are already installed
+   - Project type (frontend/backend/fullstack)
+
+3. Use this context to:
+   - Research the CORRECT version of documentation
+   - Follow project conventions in examples
+   - Avoid suggesting libraries that conflict with existing stack
+
+### Step 2: Validate Request
 
 Before proceeding, verify the request contains:
 1. **Technology/library name** - What to research
@@ -246,7 +266,7 @@ Please provide:
 
 Do NOT proceed with research if the request is vague.
 
-### Step 2: Check Target File & Existing References
+### Step 3: Check Target File & Existing References
 
 **Always check if target file exists BEFORE researching:**
 
@@ -260,7 +280,7 @@ Do NOT proceed with research if the request is vague.
    - Check SKILL.md references index for related knowledge
    - Proceed with full research
 
-### Step 3: Check Related Knowledge
+### Step 4: Check Related Knowledge
 
 Check for related existing knowledge that might help:
 
@@ -276,9 +296,9 @@ Check for related existing knowledge that might help:
 
 3. If relevant files exist, Read them for context
 
-### Step 4: Research Documentation
+### Step 5: Research Documentation
 
-Execute systematic research **focused on gaps identified in Step 2:**
+Execute systematic research **focused on gaps identified in Step 3:**
 
 1. **Start with official sources:**
    ```
@@ -306,7 +326,7 @@ Execute systematic research **focused on gaps identified in Step 2:**
    - Ignore SEO-spam sites
    - Extract only information relevant to the stated context
 
-### Step 5: Write/Update Knowledge Document (MANDATORY)
+### Step 6: Write/Update Knowledge Document (MANDATORY)
 
 **YOU MUST COMPLETE THIS STEP. NO EXCEPTIONS.**
 
@@ -377,7 +397,7 @@ Write(
 )
 ```
 
-### Step 6: Update SKILL.md Index
+### Step 7: Update SKILL.md Index
 
 After writing a reference file, update the SKILL.md index:
 
@@ -386,7 +406,7 @@ After writing a reference file, update the SKILL.md index:
 3. If not listed, add entry: `- [{technology}-{topic}](references/{filename}.md) - {brief description}`
 4. Write updated SKILL.md
 
-### Step 7: Progressive Disclosure (if needed)
+### Step 8: Progressive Disclosure (if needed)
 
 **Threshold: 500 lines**
 
@@ -408,7 +428,7 @@ When splitting:
 3. Split content by logical sections
 4. Update SKILL.md to reference the `_index.md`
 
-### Step 8: Return Summary
+### Step 9: Return Summary
 
 After saving, return:
 ```
@@ -432,7 +452,7 @@ Key findings:
 Ready for use in current task.
 ```
 
-**NEVER return without first completing Step 5 (writing the knowledge file).**
+**NEVER return without first completing Step 6 (writing the knowledge file).**
 
 ## Migration: Old .claude/knowledge/ Format
 
