@@ -10,7 +10,7 @@
       "name": "docs-researcher",
       "description": "Subagent that researches documentation and creates project-knowledge-base skill in .claude/skills/. Supports progressive disclosure for large docs.",
       "source": "./docs-researcher",
-      "version": "0.7.0"
+      "version": "0.7.1"
     },
     {
       "name": "swarm-orchestrator",

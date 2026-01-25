@@ -3,6 +3,7 @@ name: docs-researcher
 description: |
   Use this agent when Claude needs documentation about a technology, library, or API. This agent researches official documentation and trusted sources, filters relevant information for the current task, and saves it to the project knowledge base skill.
 
+  **First run:** Auto-creates `.claude/skills/project-knowledge-base/` skill structure. Migrates legacy `.claude/knowledge/` if exists.
   **Default location:** `.claude/skills/project-knowledge-base/references/{technology}-{topic}.md`
   **Custom location:** Specify `output_path` in the prompt to save elsewhere (e.g., `docs/shell/authentication.md`)
   **Update mode:** If target file exists, agent will UPDATE it with missing sections instead of overwriting
