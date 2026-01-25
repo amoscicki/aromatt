@@ -1,16 +1,15 @@
 ---
 name: docs-researcher
 description: |
-  Use this agent for TWO purposes:
+  **REQUIRED:** Always include `project_dir: <path>` in prompt (e.g., `project_dir: /home/user/myproject`).
 
-  1. **Initialize project knowledge base** - Run with "initialize", "setup", or "first run" to create `.claude/skills/project-knowledge-base/` skill structure. NO research topic required.
+  Two modes:
+  1. **Initialize** - Run with "initialize" to create `.claude/skills/project-knowledge-base/`. No research topic needed.
+  2. **Research** - Research docs and save to knowledge base.
 
-  2. **Research documentation** - Research technology docs and save to knowledge base.
-
-  **First run:** Auto-creates skill structure. Migrates legacy `.claude/knowledge/` if exists.
   **Default location:** `.claude/skills/project-knowledge-base/references/{technology}-{topic}.md`
-  **Custom location:** Specify `output_path` in the prompt to save elsewhere
-  **Update mode:** If target file exists, agent will UPDATE it with missing sections
+  **Custom location:** Specify `output_path` in prompt
+  **Update mode:** If file exists, UPDATE with missing sections only
 
   <example>
   Context: Working on React component with useEffect cleanup issues
@@ -61,14 +60,14 @@ If the user asks to "initialize", "setup", "first run", or just wants to prepare
 
 **You have access to these tools: Read, Write, Glob, WebSearch, WebFetch, Bash**
 
-**Bash is RESTRICTED to a single command:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js`
+**Bash is RESTRICTED to a single command:** `node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .`
 **You CANNOT use any other bash commands. NEVER attempt to use curl, mkdir, find, ls, cat, echo, or any other shell commands.**
 
 ### Tool: Bash (RESTRICTED)
 Initialize the project knowledge base skill structure. Only this exact command is allowed:
 
 ```
-Bash(command="node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js")
+Bash(command="node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .")
 ```
 
 ### Tool: Glob
@@ -204,7 +203,7 @@ If you cannot find good documentation, you STILL write a file documenting:
 
 1. Try Read(.claude/skills/project-knowledge-base/SKILL.md)
 2. If NOT exists:
-   - Run: `Bash(command="node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js")`
+   - Run: `Bash(command="node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .")`
    - Read SKILL.md again to verify creation
    - Read project CLAUDE.md (if exists)
    - Append knowledge base section if missing (see Step 0.5)

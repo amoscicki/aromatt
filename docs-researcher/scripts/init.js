@@ -2,22 +2,30 @@
 const fs = require('fs');
 const path = require('path');
 
-const SKILL_DIR = '.claude/skills/project-knowledge-base';
+// Get target directory from argument (required)
+const targetArg = process.argv[2];
+if (!targetArg) {
+  console.error('Usage: node init.js <project-root-path>');
+  process.exit(1);
+}
+const targetDir = path.resolve(targetArg);
+
+const SKILL_DIR = path.join(targetDir, '.claude/skills/project-knowledge-base');
 const SKILL_FILE = path.join(SKILL_DIR, 'SKILL.md');
 const REFS_DIR = path.join(SKILL_DIR, 'references');
 
 const SKILL_TEMPLATE = `---
-name: Project Knowledge Base
+name: project-knowledge-base
 version: 1.0.0
 ---
 
 # Project Knowledge Base
 
 ## References
-<!-- Wpisy dodawane automatycznie przez docs-researcher -->
+<!-- Entries added automatically by docs-researcher -->
 
 ## Protocol
-Przed research sprawdź istniejące referencje powyżej.
+Before research, check existing references above.
 `;
 
 // Check if skill already exists
@@ -34,3 +42,4 @@ fs.writeFileSync(SKILL_FILE, SKILL_TEMPLATE);
 
 console.log('Created: ' + SKILL_FILE);
 console.log('Created: ' + REFS_DIR);
+console.log('Project knowledge base initialized in: ' + targetDir);
