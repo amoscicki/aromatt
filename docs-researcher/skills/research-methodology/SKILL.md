@@ -1,5 +1,5 @@
 ---
-name: Research Methodology
+name: research-methodology
 description: This skill should be used when docs-researcher agent needs guidance on "how to search documentation", "WebSearch query patterns", "filtering search results", "documentation research strategy", or "creating knowledge files". Provides systematic methodology for effective technical documentation research.
 version: 0.2.0
 ---
