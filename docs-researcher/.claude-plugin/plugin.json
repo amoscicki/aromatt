@@ -1,7 +1,7 @@
 {
   "name": "docs-researcher",
-  "version": "0.7.1",
-  "description": "Subagent that researches technology documentation. Creates project-knowledge-base skill in .claude/skills/. Intelligently updates existing files, supports progressive disclosure for large docs (>500 lines), auto-migrates legacy .claude/knowledge/ format.",
+  "version": "0.7.2",
+  "description": "Two modes: (1) Initialize - run with 'initialize' or 'setup' to create project-knowledge-base skill, NO research topic needed. (2) Research - research docs and save to knowledge base. Auto-creates skill on first run, migrates legacy .claude/knowledge/.",
   "author": {
     "name": "Arkadiusz Moscicki"
   }
