@@ -7,5 +7,8 @@
   "dependencies": {
     "googleapis": "^170.1.0",
     "open": "^11.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.2"
   }
 }

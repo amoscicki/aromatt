@@ -1,7 +1,7 @@
 {
   "name": "docs-researcher",
-  "version": "0.7.4",
-  "description": "IMPORTANT: Always provide project_dir in prompt (e.g. 'project_dir: /path/to/project'). Two modes: (1) Initialize - run with 'initialize' to create skill, no research topic needed. (2) Research - research docs and save to knowledge base.",
+  "version": "0.8.0",
+  "description": "Initialize project knowledge base or research documentation. Use 'init' to setup, or provide a research topic.",
   "author": {
     "name": "Arkadiusz Moscicki"
   }

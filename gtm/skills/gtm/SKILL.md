@@ -14,6 +14,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js $ARGUMENTS
 ```
 
 Notes:
-- Credentials/tokens live in the current repo under `.gtm/`.
-- If `.gtm/credentials.json` is missing, use `auth credentials set --file ...` or clipboard paste.
+- Credentials/tokens are stored plugin-local (in the gtm plugin's `scripts/.gtm/` directory).
+- Once authenticated, works from any project.
+- If credentials are missing, use `auth credentials set --file ...` or clipboard paste.
 - Default login scope is edit (`tagmanager.edit.containers`).

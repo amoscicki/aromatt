@@ -8,9 +8,9 @@
   "plugins": [
     {
       "name": "docs-researcher",
-      "description": "REQUIRED: provide project_dir in prompt. Two modes: (1) Initialize - create skill, no topic needed. (2) Research - save docs to knowledge base.",
+      "description": "Initialize project knowledge base or research documentation. Use 'init' to setup, or provide a research topic.",
       "source": "./docs-researcher",
-      "version": "0.7.4"
+      "version": "0.8.0"
     },
     {
       "name": "swarm-orchestrator",
