@@ -8,9 +8,9 @@
   "plugins": [
     {
       "name": "docs-researcher",
-      "description": "Initialize project knowledge base or research documentation. Use 'init' to setup, or provide a research topic.",
+      "description": "Manage project knowledge base. Three modes: init (setup), retrieve (check existing), research (web search + save).",
       "source": "./docs-researcher",
-      "version": "0.8.0"
+      "version": "0.9.0"
     },
     {
       "name": "swarm-orchestrator",
