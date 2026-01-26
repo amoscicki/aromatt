@@ -16,16 +16,17 @@ const REFS_DIR = path.join(SKILL_DIR, 'references');
 
 const SKILL_TEMPLATE = `---
 name: project-knowledge-base
-version: 1.0.0
+description: Project-specific documentation and patterns. Check references below before coding unfamiliar patterns. To add new knowledge, invoke the docs-researcher agent.
 ---
 
 # Project Knowledge Base
 
-## References
-<!-- Entries added automatically by docs-researcher -->
+This skill contains researched documentation specific to this project. Entries are added by the \`docs-researcher\` agent.
 
-## Protocol
-Before research, check existing references above.
+## References
+<!-- Entries added by docs-researcher agent -->
+
+To add new knowledge, invoke the \`docs-researcher\` agent with: \`<technology> <topic> for <context>\`
 `;
 
 // Check if skill already exists
