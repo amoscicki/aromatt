@@ -17,6 +17,12 @@
       "description": "Multi-agent parallel task orchestration with wave-based execution, automatic auditing, and model escalation",
       "source": "./swarm",
       "version": "1.0.4"
+    },
+    {
+      "name": "gtm",
+      "description": "Google Tag Manager API v2 CLI for LLM agents - manage accounts, containers, tags, triggers, variables",
+      "source": "./gtm",
+      "version": "1.0.0"
     }
   ]
 }

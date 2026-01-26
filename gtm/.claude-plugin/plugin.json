@@ -1,0 +1,8 @@
+{
+  "name": "gtm",
+  "version": "0.1.0",
+  "description": "Google Tag Manager (API v2) CLI + OAuth2 skill (repo-local tokens) for Claude Code",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  }
+}

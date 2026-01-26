@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTM Authentication Complete</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-deep: #050608;
+      --bg-surface: rgba(12, 14, 18, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.06);
+      --border-glow: rgba(74, 222, 128, 0.2);
+      --text-primary: #f0f2f5;
+      --text-muted: rgba(240, 242, 245, 0.55);
+      --text-subtle: rgba(240, 242, 245, 0.35);
+      --accent: #4ade80;
+      --accent-glow: rgba(74, 222, 128, 0.15);
+      --font-display: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-display);
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      overflow: hidden;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      position: relative;
+    }
+
+    /* Ambient background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(74, 222, 128, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 50% at 80% 50%, rgba(56, 189, 248, 0.04) 0%, transparent 40%),
+        radial-gradient(ellipse 50% 40% at 20% 80%, rgba(168, 85, 247, 0.03) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    /* Subtle grid overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 420px;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 40px 32px 32px;
+      backdrop-filter: blur(40px);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+        0 20px 50px -20px rgba(0, 0, 0, 0.5),
+        0 0 100px -50px rgba(74, 222, 128, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+    }
+
+    /* Success icon */
+    .icon-wrapper {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 28px;
+      position: relative;
+      animation: scaleIn 0.6s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      opacity: 0;
+      transform: scale(0.5);
+    }
+
+    @keyframes scaleIn {
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .icon-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      opacity: 0.2;
+      animation: ringPulse 2s ease-out infinite;
+    }
+
+    .icon-ring:nth-child(2) {
+      animation-delay: 0.5s;
+    }
+
+    @keyframes ringPulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.2;
+      }
+      100% {
+        transform: scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    .icon-circle {
+      position: absolute;
+      inset: 0;
+      background: var(--accent-glow);
+      border: 1.5px solid rgba(74, 222, 128, 0.3);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+    }
+
+    .checkmark {
+      width: 28px;
+      height: 28px;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .checkmark path {
+      stroke-dasharray: 30;
+      stroke-dashoffset: 30;
+      animation: drawCheck 0.4s 0.5s ease forwards;
+    }
+
+    @keyframes drawCheck {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    /* Typography */
+    .title {
+      font-size: 22px;
+      font-weight: 500;
+      text-align: center;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      animation: fadeUp 0.6s 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      font-weight: 400;
+      line-height: 1.5;
+      margin-bottom: 28px;
+      animation: fadeUp 0.6s 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    /* Command block */
+    .command-block {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      animation: fadeUp 0.6s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    .command-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .command-text {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-primary);
+      user-select: all;
+      word-break: break-all;
+    }
+
+    /* Button */
+    .btn {
+      width: 100%;
+      height: 48px;
+      background: rgba(74, 222, 128, 0.1);
+      border: 1px solid rgba(74, 222, 128, 0.25);
+      border-radius: 12px;
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--accent);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.6s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .btn:hover {
+      border-color: rgba(74, 222, 128, 0.4);
+      background: rgba(74, 222, 128, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .btn:hover::before {
+      opacity: 1;
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .btn.copied {
+      background: rgba(74, 222, 128, 0.2);
+      border-color: var(--accent);
+    }
+
+    /* Footer hint */
+    .hint {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-subtle);
+      animation: fadeUp 0.6s 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    .hint kbd {
+      display: inline-block;
+      padding: 3px 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      margin: 0 2px;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .card {
+        padding: 32px 24px 24px;
+      }
+
+      .icon-wrapper {
+        width: 64px;
+        height: 64px;
+      }
+
+      .title {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="icon-wrapper">
+        <div class="icon-ring"></div>
+        <div class="icon-ring"></div>
+        <div class="icon-circle">
+          <svg class="checkmark" viewBox="0 0 24 24">
+            <path d="M6 12.5l4 4 8-9"/>
+          </svg>
+        </div>
+      </div>
+
+      <h1 class="title">Authentication Successful</h1>
+      <p class="subtitle">Your GTM token has been saved.<br>You can return to the terminal.</p>
+
+      <div class="command-block">
+        <div class="command-label">Verify command</div>
+        <code class="command-text" id="command">__VERIFY_COMMAND__</code>
+      </div>
+
+      <button class="btn" id="copyBtn" type="button">
+        <span class="btn-content">
+          <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+          <span id="btnText">Copy command</span>
+        </span>
+      </button>
+    </div>
+
+    <p class="hint">
+      Press <kbd>Ctrl</kbd><kbd>W</kbd> or <kbd>Cmd</kbd><kbd>W</kbd> to close this tab
+    </p>
+  </div>
+
+  <script>
+    (function() {
+      const btn = document.getElementById('copyBtn');
+      const btnText = document.getElementById('btnText');
+      const command = document.getElementById('command');
+      let timeout;
+
+      btn.addEventListener('click', async function() {
+        try {
+          await navigator.clipboard.writeText(command.textContent);
+          btn.classList.add('copied');
+          btnText.textContent = 'Copied!';
+
+          clearTimeout(timeout);
+          timeout = setTimeout(() => {
+            btn.classList.remove('copied');
+            btnText.textContent = 'Copy command';
+          }, 2000);
+        } catch (e) {
+          // Fallback selection
+          const range = document.createRange();
+          range.selectNodeContents(command);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          btnText.textContent = 'Selected!';
+
+          clearTimeout(timeout);
+          timeout = setTimeout(() => {
+            btnText.textContent = 'Copy command';
+          }, 2000);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
