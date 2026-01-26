@@ -1,5 +1,0 @@
-node_modules/
-bun.lock
-
-# Credentials and tokens (stored in scripts/.gtm/)
-scripts/.gtm/

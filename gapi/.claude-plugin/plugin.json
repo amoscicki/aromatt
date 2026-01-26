@@ -1,0 +1,8 @@
+{
+  "name": "gapi",
+  "version": "1.0.0",
+  "description": "Google Tag Manager + Analytics Admin APIs CLI for Claude Code (shared OAuth2)",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  }
+}

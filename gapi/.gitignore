@@ -1,0 +1,5 @@
+node_modules/
+bun.lock
+
+# Google APIs credentials and tokens (shared by gtm.js and ga.js)
+scripts/.gapis/

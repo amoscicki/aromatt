@@ -19,9 +19,9 @@
       "version": "1.0.4"
     },
     {
-      "name": "gtm",
-      "description": "Google Tag Manager API v2 CLI for LLM agents - manage accounts, containers, tags, triggers, variables",
-      "source": "./gtm",
+      "name": "gapi",
+      "description": "Google Tag Manager + Analytics Admin APIs CLI - manage GTM containers/tags/triggers and GA properties/data-streams",
+      "source": "./gapi",
       "version": "1.0.0"
     }
   ]
