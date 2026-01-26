@@ -16,7 +16,7 @@ When argument is `init`:
    node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .
    ```
 
-2. Check if `.claude/CLAUDE.md` exists:
+2. Check if `CLAUDE.md` exists (at project root):
    - If exists: Read it and append the knowledge base section if not already present
    - If not exists: Create it with the knowledge base section
 
@@ -40,7 +40,7 @@ Always consult the knowledge base when clarification is needed.
 User: /docs-researcher init
 Actions:
   1. Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .)
-  2. Read .claude/CLAUDE.md (if exists)
+  2. Read CLAUDE.md (if exists, at project root)
   3. Write updated CLAUDE.md with knowledge base section
 Response: Report what was created/updated
 ```

@@ -10,7 +10,7 @@
       "name": "docs-researcher",
       "description": "Manage project knowledge base. Use 'init' to setup, or provide a topic to research.",
       "source": "./docs-researcher",
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "name": "swarm-orchestrator",

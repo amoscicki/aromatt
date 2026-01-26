@@ -1,6 +1,6 @@
 {
   "name": "docs-researcher",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Manage project knowledge base. Use 'init' to setup, or provide a topic to research.",
   "author": {
     "name": "Arkadiusz Moscicki"
