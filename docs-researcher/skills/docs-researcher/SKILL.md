@@ -1,7 +1,7 @@
 ---
 name: docs-researcher
-description: Manage project knowledge base. Three modes - init (setup), retrieve (check existing), research (web search + save).
-argument-hint: "init | retrieve <topic> | research <technology> <topic> for <context>"
+description: Manage project knowledge base. Use "init" to setup, or provide a topic to research.
+argument-hint: "init | <technology> <topic> for <context>"
 allowed-tools: Bash, Read, Write, Task
 ---
 
@@ -29,8 +29,8 @@ When argument is `init`:
 This project uses `.claude/skills/project-knowledge-base/` for documentation.
 
 **Before coding unfamiliar patterns:**
-1. Check existing knowledge: `/docs-researcher retrieve <topic>`
-2. If not found, research: `/docs-researcher research <technology> <topic> for <context>`
+1. Load the `project-knowledge-base` skill to see available references
+2. If topic not covered, use `/docs-researcher <technology> <topic> for <context>`
 
 Always consult the knowledge base when clarification is needed.
 ```
@@ -45,36 +45,15 @@ Actions:
 Response: Report what was created/updated
 ```
 
-## Mode 2: Retrieve (`retrieve <topic>`)
+## Mode 2: Research
 
-When argument starts with `retrieve`, invoke agent in retrieve-only mode.
-
-```
-Task(
-  subagent_type: "docs-researcher", 
-  description: "Retrieve knowledge",
-  prompt: "MODE: retrieve\n\n{topic}"
-)
-```
-
-Agent will search local knowledge base and return content. No web search.
-
-**Example:**
-```
-User: /docs-researcher retrieve tanstack router
-Action: Task(subagent_type: "docs-researcher", prompt: "MODE: retrieve\n\ntanstack router")
-Response: Agent returns matching knowledge or "not found"
-```
-
-## Mode 3: Research (`research <topic>`)
-
-When argument starts with `research` or is a research request, invoke agent in research mode.
+When argument is a research request (not "init"), invoke the `docs-researcher` agent.
 
 ```
 Task(
   subagent_type: "docs-researcher", 
   description: "Research documentation",
-  prompt: "MODE: research\n\n{user's research request}"
+  prompt: "{user's research request}"
 )
 ```
 
@@ -86,7 +65,7 @@ Agent will:
 
 **Example:**
 ```
-User: /docs-researcher research TanStack Router beforeLoad for authentication guards
-Action: Task(subagent_type: "docs-researcher", prompt: "MODE: research\n\nTanStack Router beforeLoad for authentication guards")
+User: /docs-researcher TanStack Router beforeLoad for authentication guards
+Action: Task(subagent_type: "docs-researcher", prompt: "TanStack Router beforeLoad for authentication guards")
 Response: Agent's research results
 ```
