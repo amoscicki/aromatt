@@ -114,23 +114,78 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
         "*.md", "*.mdx",
     ]
 
-    # Exclude patterns
+    # Exclude patterns (globset syntax: ** matches nested dirs)
     exclude_patterns = [
-        "node_modules", ".git", "dist", "build",
-        ".next", "__pycache__", "coverage",
-        ".venv", "venv", "vendor",
-        ".idea", ".vscode", ".claude", ".swarm",
-        "*.min.js", "*.min.css", "*.map",
-        "*.lock", "package-lock.json", "yarn.lock",
-        "target",
+        # Dependencies — nested to catch monorepo/turborepo/submodule layouts
+        "**/node_modules",
+        "**/bower_components",
+        "**/.pnpm",
+
+        # VCS & metadata
+        "**/.git",
+        "**/.svn",
+        "**/.hg",
+
+        # Build outputs
+        "**/dist",
+        "**/build",
+        "**/out",
+        "**/.next",
+        "**/.nuxt",
+        "**/.turbo",
+        "**/.cache",
+        "**/target",              # Rust / Java
+        "**/__pycache__",
+        "**/*.egg-info",
+
+        # Test & coverage artifacts
+        "**/coverage",
+        "**/.nyc_output",
+
+        # Virtual environments
+        "**/.venv",
+        "**/venv",
+        "**/vendor",
+
+        # IDE & tooling
+        "**/.idea",
+        "**/.vscode",
+        "**/.claude",
+        "**/.swarm",
+        "**/.specify",
+
+        # Monorepo / workspace nested packages with own deps
+        "**/packages/*/node_modules",
+        "**/apps/*/node_modules",
+        "**/libs/*/node_modules",
+
+        # Minified & generated assets
+        "**/*.min.js",
+        "**/*.min.css",
+        "**/*.map",
+        "**/*.d.ts",
+
+        # Lock files
+        "**/*.lock",
+        "**/package-lock.json",
+        "**/yarn.lock",
+        "**/pnpm-lock.yaml",
+        "**/shrinkwrap.json",
+
+        # Misc large/binary
+        "**/*.wasm",
+        "**/*.pyc",
+        "**/*.pyo",
     ]
 
     # Source: Local files with pattern filtering
+    # max_file_size: skip files > 500KB (bundled JS, large fixtures, etc.)
     data_scope["files"] = flow_builder.add_source(
         cocoindex.sources.LocalFile(
             path=project_root,
             included_patterns=include_patterns,
             excluded_patterns=exclude_patterns,
+            max_file_size=512_000,
         )
     )
 
