@@ -214,8 +214,13 @@ def cmd_run(project_root: str):
     # Add parent dir to path for imports
     sys.path.insert(0, str(Path(__file__).parent))
 
-    import cocoindex
-    from main import codebase_index_flow, get_db_url, load_gemini_api_key
+    try:
+        import cocoindex
+        from main import codebase_index_flow, get_db_url, load_gemini_api_key
+    except ImportError as e:
+        log(f"Missing required packages: {e}")
+        log("Install with: pip install cocoindex psycopg2-binary")
+        sys.exit(1)
 
     log(f"Daemon starting for project: {project_root}")
 

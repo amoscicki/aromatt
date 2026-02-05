@@ -9,7 +9,12 @@ import sys
 import json
 from pathlib import Path
 
-import cocoindex
+try:
+    import cocoindex
+except ImportError:
+    print("Missing required packages. Install with:", file=sys.stderr)
+    print("  pip install cocoindex psycopg2-binary", file=sys.stderr)
+    sys.exit(1)
 
 # Configuration
 INDEXER_DIR = Path(__file__).parent.parent / "scripts" / ".semantic-indexer"
@@ -34,7 +39,7 @@ def load_gemini_api_key() -> str:
 
     raise ValueError(
         "Missing Gemini API key. Set via:\n"
-        "  node setup.js auth set --file /path/to/credentials.json\n"
+        f"  echo '{{\"gemini_api_key\": \"YOUR_KEY\"}}' > {CREDENTIALS_PATH}\n"
         "Or set GEMINI_API_KEY environment variable."
     )
 
@@ -184,11 +189,21 @@ def initialize():
     os.environ["GEMINI_API_KEY"] = api_key
 
     # Initialize CocoIndex
-    cocoindex.init(
-        cocoindex.Settings(
-            database=cocoindex.DatabaseConnectionSpec(url=db_url)
+    docker_dir = Path(__file__).parent.parent / "docker"
+    try:
+        cocoindex.init(
+            cocoindex.Settings(
+                database=cocoindex.DatabaseConnectionSpec(url=db_url)
+            )
         )
-    )
+    except RuntimeError as e:
+        if "connect" in str(e).lower() or "timed out" in str(e).lower():
+            raise RuntimeError(
+                f"Cannot connect to database. Start pgvector container:\n"
+                f"  cd {docker_dir} && docker-compose up -d\n"
+                f"Original error: {e}"
+            ) from e
+        raise
 
 
 def index_project(project_root: str, watch: bool = False):
@@ -350,17 +365,74 @@ def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.
     }, indent=2))
 
 
+def projects_add(path: str):
+    """Add a project to the watch list."""
+    path = os.path.abspath(path)
+    if not os.path.isdir(path):
+        print(json.dumps({"ok": False, "error": f"Directory not found: {path}"}))
+        sys.exit(1)
+
+    INDEXER_DIR.mkdir(parents=True, exist_ok=True)
+
+    projects = load_projects()
+    existing = [p for p in projects if p["path"] == path]
+    if existing:
+        print(json.dumps({"ok": True, "message": "Project already in list", "path": path}))
+        return
+
+    from datetime import datetime
+    projects.append({
+        "path": path,
+        "addedAt": datetime.utcnow().isoformat() + "Z",
+    })
+
+    with open(PROJECTS_PATH, "w") as f:
+        json.dump({"projects": projects}, f, indent=2)
+
+    print(json.dumps({"ok": True, "action": "projects.add", "path": path}))
+
+
+def projects_remove(path: str):
+    """Remove a project from the watch list."""
+    path = os.path.abspath(path)
+    projects = load_projects()
+    new_projects = [p for p in projects if p["path"] != path]
+
+    if len(new_projects) == len(projects):
+        print(json.dumps({"ok": False, "error": f"Project not found: {path}"}))
+        sys.exit(1)
+
+    with open(PROJECTS_PATH, "w") as f:
+        json.dump({"projects": new_projects}, f, indent=2)
+
+    print(json.dumps({"ok": True, "action": "projects.remove", "path": path}))
+
+
+def projects_list():
+    """List all projects in watch list."""
+    projects = load_projects()
+    print(json.dumps({
+        "ok": True,
+        "action": "projects.list",
+        "count": len(projects),
+        "projects": projects,
+    }, indent=2))
+
+
 def main():
     """CLI entry point."""
     if len(sys.argv) < 2:
         print(json.dumps({
             "ok": True,
             "usage": {
-                "daemon": "python main.py daemon",
-                "index": "python main.py index <project_path> [--watch]",
                 "search": "python main.py search <project_path> <query> [limit] [threshold]",
+                "index": "python main.py index <project_path> [--watch]",
+                "projects add": "python main.py projects add <path>",
+                "projects remove": "python main.py projects remove <path>",
+                "projects list": "python main.py projects list",
+                "daemon": "python main.py daemon",
             }
-        }))
+        }, indent=2))
         return
 
     command = sys.argv[1]
@@ -383,6 +455,26 @@ def main():
         limit = int(sys.argv[4]) if len(sys.argv) > 4 else 10
         threshold = float(sys.argv[5]) if len(sys.argv) > 5 else 0.3
         search(project_path, query, limit, threshold)
+    elif command == "projects":
+        if len(sys.argv) < 3:
+            print(json.dumps({"ok": False, "error": "Usage: projects add|remove|list [path]"}))
+            sys.exit(1)
+        subcommand = sys.argv[2]
+        if subcommand == "add":
+            if len(sys.argv) < 4:
+                print(json.dumps({"ok": False, "error": "Missing path"}))
+                sys.exit(1)
+            projects_add(sys.argv[3])
+        elif subcommand == "remove":
+            if len(sys.argv) < 4:
+                print(json.dumps({"ok": False, "error": "Missing path"}))
+                sys.exit(1)
+            projects_remove(sys.argv[3])
+        elif subcommand == "list":
+            projects_list()
+        else:
+            print(json.dumps({"ok": False, "error": f"Unknown subcommand: {subcommand}"}))
+            sys.exit(1)
     else:
         print(json.dumps({"ok": False, "error": f"Unknown command: {command}"}))
         sys.exit(1)

@@ -1,8 +1,8 @@
 ---
 name: semantic-search
-description: Semantic codebase search with pgvector. Finds code by MEANING. **USE THIS FIRST** before grep/glob. Returns file paths + exact line ranges for precise reads.
-allowed-tools: Bash(node:*)
-argument-hint: "<natural language query> [--project <path>]"
+description: Semantic codebase search with pgvector. Finds code by MEANING. **USE THIS FIRST** before grep/glob. Returns file paths + byte ranges for precise reads.
+allowed-tools: Bash(python:*)
+argument-hint: "<natural language query> [project_path]"
 ---
 
 # Semantic Codebase Search
@@ -12,7 +12,7 @@ Find code by meaning, not just keywords. **Always use this tool FIRST** before f
 ## Quick Search
 
 ```bash
-node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "$ARGUMENTS" --project .
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "$ARGUMENTS"
 ```
 
 ## Search Strategy
@@ -23,23 +23,18 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "$ARGUMENTS" --project .
 
 ```bash
 # Search current project
-node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "user authentication flow" --project .
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "user authentication flow"
 
 # Search specific project
-node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "database connection pool" --project P:\myproject
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "P:/myproject" "database connection pool"
+
+# With limit and threshold
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "query" 10 0.3
 ```
 
-### 2. Read Results with Line Ranges
+### 2. Read Results
 
-Results include exact line numbers. Read files using those ranges:
-
-```bash
-# Example: result shows start_line: 45, end_line: 89
-# Read exactly those lines (45 lines starting from line 45)
-head -89 path/to/file.ts | tail -n +45
-```
-
-**DO NOT** read entire files. Use the line ranges from search results.
+Results include file paths and similarity scores. Read the relevant files to get full context.
 
 ### 3. Fall Back to Grep/Glob
 
@@ -50,27 +45,19 @@ Only use grep/glob if:
 
 ## Upstream/Downstream Impact Review
 
-**BEFORE making any edits**, you MUST review impact:
+**BEFORE making any edits**, review impact:
 
 ### Step 1: Find Callers (Upstream)
 
-Search for code that USES what you're about to modify:
-
 ```bash
-# Find what calls this function
-node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "calls functionName" --project .
-
-# Find imports of this module
-node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "imports from module-name" --project .
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "calls functionName"
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "imports from module-name"
 ```
 
 ### Step 2: Find Dependencies (Downstream)
 
-Search for what the code DEPENDS on:
-
 ```bash
-# Find what this function uses
-node ${CLAUDE_PLUGIN_ROOT}/scripts/search.js --query "dependencies of functionName" --project .
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "dependencies of functionName"
 ```
 
 ### Step 3: Document Impact
@@ -80,78 +67,73 @@ Before proceeding with edits, list:
 2. Functions/components that depend on the code
 3. Potential breaking changes
 
-### Step 4: Verify After Edits
-
-After making changes, re-run semantic search to confirm no broken references.
-
 ---
 
 ## Daemon Management
 
-The indexer runs as a persistent background daemon.
+The indexer runs as a persistent background daemon (pure Python).
 
 ```bash
 # Start daemon (runs in background, persists after Claude exits)
-node ${CLAUDE_PLUGIN_ROOT}/scripts/daemon.js start
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py start
 
 # Check daemon status
-node ${CLAUDE_PLUGIN_ROOT}/scripts/daemon.js status
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py status
 
 # View indexing logs
-node ${CLAUDE_PLUGIN_ROOT}/scripts/daemon.js logs --tail 50
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py logs --tail 50
+
+# Follow logs in real-time
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py logs --follow
 
 # Stop daemon
-node ${CLAUDE_PLUGIN_ROOT}/scripts/daemon.js stop
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py stop
 ```
 
 ## Project Management
 
 ```bash
-# Add project to watch list
-node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js add P:\myproject
+# Add project to watch list (for daemon)
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py projects add "P:/myproject"
 
-# List watched projects
-node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js list
+# List all projects
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py projects list
 
 # Remove project from watch list
-node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js remove P:\myproject
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py projects remove "P:/myproject"
+```
 
-# Force reindex a project
-node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js reindex P:\myproject
+## Indexing
 
-# Clear project data from database
-node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js clear P:\myproject
+```bash
+# Index a project once (no daemon)
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "P:/myproject"
+
+# Index with file watching (foreground)
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "P:/myproject" --watch
 ```
 
 ## Setup
 
 ### Prerequisites
 - Docker running
-- Python 3.8+ installed
+- Python 3.10+ with cocoindex, psycopg2
 - Gemini API key
 
 ### Initial Setup
 
 ```bash
 # 1. Start pgvector container
-node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.js docker-up
+cd ${CLAUDE_PLUGIN_ROOT}/docker && docker-compose up -d
 
-# 2. Install CocoIndex Python dependencies
-node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.js install-python
+# 2. Install Python dependencies
+pip install cocoindex psycopg2-binary
 
-# 3. Set Gemini API key (one of these):
-node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.js auth set --file /path/to/credentials.json
-node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.js auth paste-win --overwrite  # Windows clipboard
-node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.js auth set-key --key "your-api-key"
+# 3. Set Gemini API key (create credentials.json)
+echo '{"gemini_api_key": "your-key"}' > ${CLAUDE_PLUGIN_ROOT}/scripts/.semantic-indexer/credentials.json
 
-# 4. Check setup
-node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.js check-env
-
-# 5. Start daemon (uses CocoIndex for file watching + Tree-sitter parsing)
-node ${CLAUDE_PLUGIN_ROOT}/scripts/daemon.js start
-
-# 6. Add project to index
-node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js add .
+# 4. Index your project
+python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "."
 ```
 
 ## Search Output Format
@@ -166,11 +148,9 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js add .
     {
       "file_path": "src/auth/login.ts",
       "file_name": "login.ts",
-      "start_line": 45,
-      "end_line": 89,
+      "content": "async function authenticateUser...",
+      "location": {"start": 1234, "end": 2345},
       "similarity": 0.87,
-      "symbol_name": "authenticateUser",
-      "node_type": "function_declaration",
       "preview": "async function authenticateUser(credentials: Credentials)..."
     }
   ]
@@ -181,16 +161,12 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/projects.js add .
 
 | Command | Description |
 |---------|-------------|
-| `search.js --query "..." --project .` | Semantic search |
-| `daemon.js start` | Start background indexer |
-| `daemon.js stop` | Stop indexer |
-| `daemon.js status` | Check daemon status |
-| `daemon.js logs` | View indexing logs |
-| `projects.js add <path>` | Add project to watch |
-| `projects.js remove <path>` | Remove from watch |
-| `projects.js list` | List watched projects |
-| `projects.js reindex <path>` | Reindex project |
-| `setup.js docker-up` | Start pgvector container |
-| `setup.js docker-down` | Stop container |
-| `setup.js auth set --file <path>` | Set API key from file |
-| `setup.js check-env` | Check environment |
+| `main.py search <project> <query> [limit] [threshold]` | Semantic search |
+| `main.py index <project> [--watch]` | Index project |
+| `main.py projects add <path>` | Add project to daemon watch list |
+| `main.py projects list` | List watched projects |
+| `main.py projects remove <path>` | Remove project from watch list |
+| `daemon.py start` | Start background indexer |
+| `daemon.py stop` | Stop indexer |
+| `daemon.py status` | Check daemon status |
+| `daemon.py logs [--tail N] [--follow]` | View logs |

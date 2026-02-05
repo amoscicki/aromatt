@@ -6,3 +6,4 @@ scripts/.semantic-indexer/
 
 # Build artifacts
 *.log
+__pycache__/
