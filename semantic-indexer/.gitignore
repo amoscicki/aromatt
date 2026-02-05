@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+
+# Runtime state (credentials, PID, logs)
+scripts/.semantic-indexer/
+
+# Build artifacts
+*.log

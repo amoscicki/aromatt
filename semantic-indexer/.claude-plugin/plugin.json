@@ -1,0 +1,8 @@
+{
+  "name": "semantic-indexer",
+  "version": "1.0.0",
+  "description": "Semantic codebase search with pgvector embeddings. Multi-project support with persistent daemon. Use semantic search BEFORE grep/glob.",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  }
+}

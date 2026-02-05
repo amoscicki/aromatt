@@ -23,6 +23,12 @@
       "description": "Google Tag Manager + Analytics Admin APIs CLI - manage GTM containers/tags/triggers and GA properties/data-streams",
       "source": "./gapi",
       "version": "1.0.0"
+    },
+    {
+      "name": "semantic-indexer",
+      "description": "Semantic codebase search with pgvector. Multi-project support, persistent daemon. USE FIRST before grep/glob.",
+      "source": "./semantic-indexer",
+      "version": "1.0.0"
     }
   ]
 }
