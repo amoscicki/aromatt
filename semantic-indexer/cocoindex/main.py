@@ -7,16 +7,9 @@ Uses Tree-sitter for AST-aware chunking and Gemini for embeddings.
 import os
 import sys
 import json
-import hashlib
 from pathlib import Path
-from typing import Optional
-from datetime import datetime
 
 import cocoindex
-
-# Access classes via module attributes (cocoindex uses lazy loading)
-LocalFile = cocoindex.sources.LocalFile
-Postgres = cocoindex.targets.Postgres
 
 # Configuration
 INDEXER_DIR = Path(__file__).parent.parent / "scripts" / ".semantic-indexer"
@@ -29,14 +22,12 @@ DEFAULT_DB_URL = "postgresql://indexer:indexer_dev@localhost:5433/codebase_index
 
 def load_gemini_api_key() -> str:
     """Load Gemini API key from credentials file or environment."""
-    # Try credentials file first
     if CREDENTIALS_PATH.exists():
         with open(CREDENTIALS_PATH) as f:
             data = json.load(f)
             if "gemini_api_key" in data:
                 return data["gemini_api_key"]
 
-    # Fallback to environment
     key = os.environ.get("GEMINI_API_KEY")
     if key:
         return key
@@ -57,13 +48,6 @@ def load_projects() -> list[dict]:
         return data.get("projects", [])
 
 
-def save_projects(projects: list[dict]):
-    """Save project list to projects.json."""
-    INDEXER_DIR.mkdir(parents=True, exist_ok=True)
-    with open(PROJECTS_PATH, "w") as f:
-        json.dump({"projects": projects}, f, indent=2)
-
-
 def get_db_url() -> str:
     """Get database URL from config or environment."""
     config_path = INDEXER_DIR / "config.json"
@@ -81,39 +65,28 @@ def get_db_url() -> str:
     return os.environ.get("COCOINDEX_DATABASE_URL", DEFAULT_DB_URL)
 
 
-# Custom Gemini embedding function for CocoIndex
-class GeminiEmbedding:
-    """Gemini text-embedding-004 wrapper for CocoIndex."""
+# Helper function to extract file extension
+@cocoindex.op.function()
+def extract_extension(filename: str) -> str:
+    """Extract file extension for language detection."""
+    return os.path.splitext(filename)[1].lstrip(".")
 
-    def __init__(self, api_key: str, task_type: str = "RETRIEVAL_DOCUMENT"):
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        self.task_type = task_type
-        self.model = "models/text-embedding-004"
-        self.dimension = 768
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for a batch of texts."""
-        import google.generativeai as genai
-
-        embeddings = []
-        for text in texts:
-            result = genai.embed_content(
-                model=self.model,
-                content=text,
-                task_type=self.task_type,
-            )
-            embeddings.append(result["embedding"])
-        return embeddings
+# Transform flow for embeddings - allows reuse in search
+@cocoindex.transform_flow()
+def text_to_embedding(text: cocoindex.DataSlice[str]) -> cocoindex.DataSlice[list[float]]:
+    """Embed text using Gemini text-embedding-004."""
+    return text.transform(
+        cocoindex.functions.EmbedText(
+            api_type=cocoindex.LlmApiType.GEMINI,
+            model="text-embedding-004",
+            task_type="RETRIEVAL_DOCUMENT",
+        )
+    )
 
 
 @cocoindex.flow_def(name="CodebaseIndex")
-def codebase_index_flow(
-    flow_builder: cocoindex.FlowBuilder,
-    data_scope: cocoindex.DataScope,
-    project_root: str,
-    gemini_api_key: str,
-):
+def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoindex.DataScope):
     """
     CocoIndex flow for codebase indexing.
 
@@ -122,93 +95,108 @@ def codebase_index_flow(
     3. Generate Gemini embeddings
     4. Store in pgvector
     """
+    # Get project root from environment (set before running)
+    project_root = os.environ.get("SEMANTIC_INDEXER_PROJECT_ROOT", ".")
+
     # File patterns to include
     include_patterns = [
-        "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx",
-        "**/*.py", "**/*.go", "**/*.rs",
-        "**/*.java", "**/*.kt", "**/*.c", "**/*.cpp", "**/*.h",
-        "**/*.vue", "**/*.svelte",
-        "**/*.sql", "**/*.graphql",
-        "**/*.yaml", "**/*.yml", "**/*.json", "**/*.toml",
-        "**/*.md", "**/*.mdx",
+        "*.ts", "*.tsx", "*.js", "*.jsx",
+        "*.py", "*.go", "*.rs",
+        "*.java", "*.kt", "*.c", "*.cpp", "*.h",
+        "*.vue", "*.svelte",
+        "*.sql", "*.graphql",
+        "*.yaml", "*.yml", "*.json", "*.toml",
+        "*.md", "*.mdx",
     ]
 
-    # Exclude patterns (gitignore-style)
+    # Exclude patterns
     exclude_patterns = [
-        "**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**",
-        "**/.next/**", "**/__pycache__/**", "**/coverage/**",
-        "**/.venv/**", "**/venv/**", "**/vendor/**",
-        "**/.idea/**", "**/.vscode/**", "**/.claude/**", "**/.swarm/**",
-        "**/*.min.js", "**/*.min.css", "**/*.map",
-        "**/*.lock", "**/package-lock.json", "**/yarn.lock",
+        "node_modules", ".git", "dist", "build",
+        ".next", "__pycache__", "coverage",
+        ".venv", "venv", "vendor",
+        ".idea", ".vscode", ".claude", ".swarm",
+        "*.min.js", "*.min.css", "*.map",
+        "*.lock", "package-lock.json", "yarn.lock",
+        "target",
     ]
 
     # Source: Local files with pattern filtering
-    data_scope["source_files"] = flow_builder.add_source(
-        LocalFile(
+    data_scope["files"] = flow_builder.add_source(
+        cocoindex.sources.LocalFile(
             path=project_root,
             included_patterns=include_patterns,
             excluded_patterns=exclude_patterns,
         )
     )
 
-    # Transform: Detect language from file extension
-    data_scope["with_language"] = data_scope["source_files"].transform(
-        cocoindex.functions.DetectLanguage()
-    )
+    # Create collector for code embeddings
+    code_embeddings = data_scope.add_collector()
 
-    # Transform: Split with Tree-sitter (AST-aware chunking)
-    data_scope["chunks"] = data_scope["with_language"].transform(
-        cocoindex.functions.SplitRecursively(
+    # Process each file
+    with data_scope["files"].row() as file:
+        # Detect language from extension
+        file["extension"] = file["filename"].transform(extract_extension)
+
+        # Split with Tree-sitter (AST-aware chunking)
+        file["chunks"] = file["content"].transform(
+            cocoindex.functions.SplitRecursively(),
+            language=file["extension"],
             chunk_size=1000,
             chunk_overlap=100,
-            language_field="language",  # Use detected language for Tree-sitter
         )
-    )
 
-    # Add metadata
-    data_scope["with_metadata"] = data_scope["chunks"].transform(
-        lambda chunk: {
-            **chunk,
-            "project_root": project_root,
-            "file_name": Path(chunk["file_path"]).name,
-            "content_hash": hashlib.sha256(chunk["content"].encode()).hexdigest(),
-            "updated_at": datetime.utcnow().isoformat(),
-        }
-    )
+        # Process each chunk
+        with file["chunks"].row() as chunk:
+            # Generate embedding
+            chunk["embedding"] = chunk["text"].call(text_to_embedding)
 
-    # Generate embeddings using Gemini
-    embedder = GeminiEmbedding(api_key=gemini_api_key, task_type="RETRIEVAL_DOCUMENT")
-    data_scope["with_embeddings"] = data_scope["with_metadata"].transform(
-        cocoindex.functions.Embed(
-            embedding_func=embedder.embed,
-            text_field="content",
-            embedding_field="embedding",
-        )
-    )
+            # Collect with metadata
+            code_embeddings.collect(
+                project_root=project_root,
+                file_path=file["filename"],
+                file_name=Path(file["filename"]).name if isinstance(file["filename"], str) else file["filename"],
+                content=chunk["text"],
+                location=chunk["location"],
+                embedding=chunk["embedding"],
+            )
 
     # Export to Postgres with pgvector
-    flow_builder.add_target(
-        Postgres(
-            table_name="codebase_segments",
-            primary_key=["project_root", "file_path", "start_line", "end_line"],
-            vector_index={
-                "embedding": {
-                    "metric": "cosine_similarity",
-                    "lists": 100,  # IVFFlat index config
-                }
-            }
-        ),
-        data_scope["with_embeddings"],
+    code_embeddings.export(
+        "codebase_segments",
+        cocoindex.storages.Postgres(),
+        primary_key_fields=["project_root", "file_path", "location"],
+        vector_indexes=[
+            cocoindex.VectorIndexDef(
+                field_name="embedding",
+                metric=cocoindex.VectorSimilarityMetric.COSINE_SIMILARITY,
+            )
+        ],
+    )
+
+
+def initialize():
+    """Initialize CocoIndex with database settings."""
+    db_url = get_db_url()
+    api_key = load_gemini_api_key()
+
+    # Set environment variables for CocoIndex
+    os.environ["COCOINDEX_DATABASE_URL"] = db_url
+    os.environ["GEMINI_API_KEY"] = api_key
+
+    # Initialize CocoIndex
+    cocoindex.init(
+        cocoindex.Settings(
+            database=cocoindex.DatabaseConnectionSpec(url=db_url)
+        )
     )
 
 
 def index_project(project_root: str, watch: bool = False):
     """Index a single project."""
-    api_key = load_gemini_api_key()
-    db_url = get_db_url()
+    initialize()
 
-    os.environ["COCOINDEX_DATABASE_URL"] = db_url
+    # Set project root for flow
+    os.environ["SEMANTIC_INDEXER_PROJECT_ROOT"] = project_root
 
     print(json.dumps({
         "event": "indexing_started",
@@ -216,23 +204,28 @@ def index_project(project_root: str, watch: bool = False):
         "watch_mode": watch,
     }))
 
-    # Create and run the flow
-    flow = codebase_index_flow.create(
-        project_root=project_root,
-        gemini_api_key=api_key,
-    )
+    # Setup the flow (creates tables)
+    codebase_index_flow.setup()
 
     if watch:
-        # Run with file watching (incremental updates)
-        flow.run(watch=True)
+        # Live update mode with file watching
+        updater = cocoindex.FlowLiveUpdater(
+            codebase_index_flow,
+            cocoindex.FlowLiveUpdaterOptions(print_stats=True)
+        )
+        updater.start()
+        print(json.dumps({
+            "event": "watching",
+            "project": project_root,
+        }))
+        updater.wait()
     else:
-        # Run once (full index)
-        flow.run()
-
-    print(json.dumps({
-        "event": "indexing_completed",
-        "project": project_root,
-    }))
+        # One-time update
+        update_info = codebase_index_flow.update(print_stats=True)
+        print(json.dumps({
+            "event": "indexing_completed",
+            "project": project_root,
+        }))
 
 
 def run_daemon():
@@ -246,9 +239,7 @@ def run_daemon():
         }))
         sys.exit(1)
 
-    api_key = load_gemini_api_key()
-    db_url = get_db_url()
-    os.environ["COCOINDEX_DATABASE_URL"] = db_url
+    initialize()
 
     print(json.dumps({
         "event": "daemon_started",
@@ -256,89 +247,94 @@ def run_daemon():
         "projects": [p["path"] for p in projects],
     }))
 
-    # Index all projects with watch mode
-    # CocoIndex handles incremental updates internally
-    for project in projects:
-        try:
-            flow = codebase_index_flow.create(
-                project_root=project["path"],
-                gemini_api_key=api_key,
-            )
-            flow.run(watch=True, background=True)
+    # For multi-project support, we use the first project
+    # TODO: Support multiple projects with separate flows
+    project = projects[0]
+    os.environ["SEMANTIC_INDEXER_PROJECT_ROOT"] = project["path"]
 
-            print(json.dumps({
-                "event": "watching",
-                "project": project["path"],
-            }))
-        except Exception as e:
-            print(json.dumps({
-                "event": "error",
-                "project": project["path"],
-                "error": str(e),
-            }))
+    # Setup and start live updater
+    codebase_index_flow.setup()
+
+    updater = cocoindex.FlowLiveUpdater(
+        codebase_index_flow,
+        cocoindex.FlowLiveUpdaterOptions(print_stats=True)
+    )
+    updater.start()
+
+    print(json.dumps({
+        "event": "watching",
+        "project": project["path"],
+    }))
 
     # Keep daemon running
     import signal
-    import time
 
-    def handle_sighup(signum, frame):
-        """Reload projects on SIGHUP."""
-        print(json.dumps({"event": "reload_requested"}))
-        # In a full implementation, we'd restart flows here
+    def handle_signal(signum, frame):
+        print(json.dumps({"event": "shutdown_requested"}))
+        updater.abort()
+        sys.exit(0)
 
-    # SIGHUP is only available on Unix
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+
+    # SIGHUP for reload (Unix only)
     if hasattr(signal, 'SIGHUP'):
+        def handle_sighup(signum, frame):
+            print(json.dumps({"event": "reload_requested"}))
+
         signal.signal(signal.SIGHUP, handle_sighup)
 
-    while True:
-        time.sleep(60)
+    # Wait for updater
+    updater.wait()
 
 
-def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.7):
+def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.3):
     """Search the indexed codebase."""
-    import psycopg2
+    initialize()
 
-    api_key = load_gemini_api_key()
-    db_url = get_db_url()
+    # Generate query embedding using the transform flow
+    query_embedding = text_to_embedding.eval(query)
 
-    # Generate query embedding
-    embedder = GeminiEmbedding(api_key=api_key, task_type="RETRIEVAL_QUERY")
-    query_embedding = embedder.embed([query])[0]
+    # Get table name
+    table_name = cocoindex.utils.get_target_storage_default_name(
+        codebase_index_flow, "codebase_segments"
+    )
 
     # Search in pgvector
+    import psycopg2
+    db_url = get_db_url()
     conn = psycopg2.connect(db_url)
     cur = conn.cursor()
 
-    embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
-
-    cur.execute("""
+    cur.execute(f"""
         SELECT
             file_path,
             file_name,
             content,
-            start_line,
-            end_line,
-            symbol_name,
-            node_type,
+            location,
             1 - (embedding <=> %s::vector) as similarity
-        FROM codebase_segments
+        FROM {table_name}
         WHERE project_root = %s
           AND 1 - (embedding <=> %s::vector) >= %s
         ORDER BY embedding <=> %s::vector
         LIMIT %s
-    """, (embedding_str, project_root, embedding_str, threshold, embedding_str, limit))
+    """, (query_embedding, project_root, query_embedding, threshold, query_embedding, limit))
 
     results = []
     for row in cur.fetchall():
+        location = row[3]
+        # Convert location (NumericRange or similar) to dict
+        if hasattr(location, 'lower') and hasattr(location, 'upper'):
+            location_dict = {"start": location.lower, "end": location.upper}
+        else:
+            location_dict = str(location)
+
         results.append({
             "file_path": row[0],
             "file_name": row[1],
             "content": row[2],
-            "start_line": row[3],
-            "end_line": row[4],
-            "symbol_name": row[5],
-            "node_type": row[6],
-            "similarity": round(row[7], 2),
+            "location": location_dict,
+            "similarity": round(row[4], 3),
             "preview": row[2][:200] + ("..." if len(row[2]) > 200 else ""),
         })
 
@@ -361,8 +357,8 @@ def main():
             "ok": True,
             "usage": {
                 "daemon": "python main.py daemon",
-                "index": "python main.py index <project_path>",
-                "search": "python main.py search <project_path> <query>",
+                "index": "python main.py index <project_path> [--watch]",
+                "search": "python main.py search <project_path> <query> [limit] [threshold]",
             }
         }))
         return
@@ -385,7 +381,7 @@ def main():
         project_path = os.path.abspath(sys.argv[2])
         query = sys.argv[3]
         limit = int(sys.argv[4]) if len(sys.argv) > 4 else 10
-        threshold = float(sys.argv[5]) if len(sys.argv) > 5 else 0.7
+        threshold = float(sys.argv[5]) if len(sys.argv) > 5 else 0.3
         search(project_path, query, limit, threshold)
     else:
         print(json.dumps({"ok": False, "error": f"Unknown command: {command}"}))
