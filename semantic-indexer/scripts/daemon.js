@@ -15,6 +15,7 @@ const {INDEXER_DIR} = require('./lib/auth');
 const PID_PATH = path.join(INDEXER_DIR, 'daemon.pid');
 const LOG_PATH = path.join(INDEXER_DIR, 'daemon.log');
 const WATCHER_SCRIPT = path.join(__dirname, 'watcher-main.js');
+const NODE_EXE = process.execPath;
 
 function isRunning(pid) {
   try {

@@ -13,8 +13,10 @@ from typing import Optional
 from datetime import datetime
 
 import cocoindex
-from cocoindex.sources import LocalFile
-from cocoindex.storages import Postgres
+
+# Access classes via module attributes (cocoindex uses lazy loading)
+LocalFile = cocoindex.sources.LocalFile
+Postgres = cocoindex.targets.Postgres
 
 # Configuration
 INDEXER_DIR = Path(__file__).parent.parent / "scripts" / ".semantic-indexer"
@@ -284,7 +286,9 @@ def run_daemon():
         print(json.dumps({"event": "reload_requested"}))
         # In a full implementation, we'd restart flows here
 
-    signal.signal(signal.SIGHUP, handle_sighup)
+    # SIGHUP is only available on Unix
+    if hasattr(signal, 'SIGHUP'):
+        signal.signal(signal.SIGHUP, handle_sighup)
 
     while True:
         time.sleep(60)
