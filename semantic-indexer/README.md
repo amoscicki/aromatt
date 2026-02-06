@@ -153,7 +153,7 @@ CREATE TABLE codebase_segments (
     symbol_name TEXT,
     node_type TEXT,
     content_hash TEXT NOT NULL,
-    embedding vector(768),
+    embedding vector(3072),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 ```

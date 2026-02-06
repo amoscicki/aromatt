@@ -14,16 +14,14 @@ CREATE TABLE codebase_segments (
     symbol_name TEXT,                     -- Function/class name if AST-parsed
     node_type TEXT,                       -- 'function', 'class', 'method', 'block', 'file'
     content_hash TEXT NOT NULL,           -- SHA-256 for deduplication
-    embedding vector(768),                -- Gemini gemini-embedding-001 (output_dimension=768)
+    embedding vector(3072),               -- Gemini gemini-embedding-001 (native 3072 dims)
     updated_at TIMESTAMP DEFAULT NOW(),
 
     UNIQUE(project_root, file_path, start_line, end_line)
 );
 
--- Index for vector similarity search (IVFFlat for performance)
-CREATE INDEX idx_embedding ON codebase_segments
-    USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 100);
+-- No vector index: pgvector IVFFlat/HNSW max 2000 dims, gemini-embedding-001 uses 3072.
+-- Sequential scan is fast enough for codebase-sized datasets (~1500 files).
 
 -- Index for project filtering
 CREATE INDEX idx_project_root ON codebase_segments(project_root);

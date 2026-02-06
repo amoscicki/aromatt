@@ -85,7 +85,6 @@ def text_to_embedding(text: cocoindex.DataSlice[str]) -> cocoindex.DataSlice[lis
         cocoindex.functions.EmbedText(
             api_type=cocoindex.LlmApiType.GEMINI,
             model="gemini-embedding-001",
-            output_dimension=768,
             task_type="RETRIEVAL_DOCUMENT",
         )
     )
