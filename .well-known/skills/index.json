@@ -5,7 +5,7 @@
       "id": "docs-researcher",
       "name": "Documentation Researcher",
       "description": "Manage project knowledge base. Use init to setup, or provide a topic to research.",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "path": "docs-researcher/skills/docs-researcher",
       "files": [
         "SKILL.md",
@@ -28,7 +28,7 @@
       "id": "gapi",
       "name": "Google APIs CLI",
       "description": "Run local Node CLIs for Google Tag Manager and Google Analytics Admin APIs (OAuth2). Use for GTM containers/tags/triggers or GA properties/data-streams.",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "path": "gapi/skills/gapi",
       "files": [
         "SKILL.md",
@@ -47,7 +47,7 @@
       "id": "payload-cms",
       "name": "Payload CMS",
       "description": "Query and mutate Payload CMS collections via persistent local server. Use for reading/writing data in dev or test databases.",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "path": "payload/skills/payload-cms",
       "files": [
         "SKILL.md",
@@ -58,7 +58,7 @@
       "id": "semantic-search",
       "name": "Semantic Codebase Search",
       "description": "Semantic codebase search with pgvector. Finds code by MEANING. USE THIS FIRST before grep/glob. Returns file paths + byte ranges for precise reads.",
-      "version": "1.2.2",
+      "version": "1.2.3",
       "path": "semantic-indexer/skills/semantic-search",
       "files": [
         "SKILL.md",
