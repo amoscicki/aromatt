@@ -1,0 +1,25 @@
+{
+  "skills": [
+    {
+      "id": "docs-researcher",
+      "name": "Documentation Researcher",
+      "description": "Manage project knowledge base. Use init to setup, or provide a topic to research.",
+      "path": "skills/docs-researcher",
+      "files": [
+        "SKILL.md",
+        "../../agents/docs-researcher.md"
+      ]
+    },
+    {
+      "id": "research-methodology",
+      "name": "Research Methodology",
+      "description": "Research methodology templates and query patterns for documentation research.",
+      "path": "skills/research-methodology",
+      "files": [
+        "SKILL.md",
+        "references/document-template.md",
+        "references/query-patterns.md"
+      ]
+    }
+  ]
+}

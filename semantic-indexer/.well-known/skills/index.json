@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "id": "semantic-search",
+      "name": "Semantic Codebase Search",
+      "description": "Semantic codebase search with pgvector. Finds code by MEANING. USE THIS FIRST before grep/glob. Returns file paths + byte ranges for precise reads.",
+      "path": "skills/semantic-search",
+      "files": [
+        "SKILL.md",
+        "../../cocoindex/main.py",
+        "../../cocoindex/daemon.py",
+        "../../docker/docker-compose.yml"
+      ]
+    }
+  ]
+}
