@@ -1,7 +1,7 @@
 {
   "name": "@aromatt/gtm",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GTM (Tag Manager API v2) CLI for Claude Code plugin",
   "type": "commonjs",
   "dependencies": {

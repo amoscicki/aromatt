@@ -1,9 +1,11 @@
 {
+  "version": "1.0.5",
   "skills": [
     {
       "id": "swarm",
       "name": "Swarm Execution",
       "description": "Orchestrates parallel agent workflows for complex, multi-step tasks. Decomposes work into dependency-mapped waves and executes them with autonomous agents.",
+      "version": "1.0.5",
       "path": "skills/swarm",
       "files": [
         "SKILL.md",
