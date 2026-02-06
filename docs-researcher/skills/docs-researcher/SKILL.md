@@ -13,7 +13,7 @@ When argument is `init`:
 
 1. Run the initialization script:
    ```bash
-node scripts/init.js .
+node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .
    ```
 
 2. Check if `CLAUDE.md` exists (at project root):
@@ -39,7 +39,7 @@ Always consult the knowledge base when clarification is needed.
 ```
 User: /docs-researcher init
 Actions:
-  1. Bash(node scripts/init.js .)
+  1. Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.js .)
   2. Read CLAUDE.md (if exists, at project root)
   3. Write updated CLAUDE.md with knowledge base section
 Response: Report what was created/updated

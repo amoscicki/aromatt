@@ -11,17 +11,17 @@ Persistent HTTP server + thin CLI client for Payload CMS Local API.
 
 ```bash
 # 1. Start the server (from project root)
-node scripts/payload.js start
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js start
 
 # 2. Query data
-node scripts/payload.js find users --limit 5
-node scripts/payload.js schema tutors
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find users --limit 5
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js schema tutors
 ```
 
 ## CLI
 
 ```bash
-node scripts/payload.js $ARGUMENTS
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js $ARGUMENTS
 ```
 
 Run with `help` for full command list.
@@ -51,16 +51,16 @@ The server initializes Payload once and serves requests over HTTP. This avoids r
 
 ```bash
 # Start with defaults
-node scripts/payload.js start
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js start
 
 # Start with custom port and test DB
-node scripts/payload.js start --port 9000 --test-db-url "postgresql://localhost:7357/test"
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js start --port 9000 --test-db-url "postgresql://localhost:7357/test"
 
 # Check status
-node scripts/payload.js status
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js status
 
 # Stop server
-node scripts/payload.js stop
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js stop
 ```
 
 ---
@@ -78,11 +78,11 @@ Schema includes recursive field mapping for: text, number, email, relationship, 
 
 ```bash
 # List all collections
-node scripts/payload.js collections list
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js collections list
 
 # Get schema for a collection
-node scripts/payload.js schema users
-node scripts/payload.js schema calendarEntries
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js schema users
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js schema calendarEntries
 ```
 
 ---
@@ -134,25 +134,25 @@ Compound:
 
 ```bash
 # Find first 5 users
-node scripts/payload.js find users --limit 5
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find users --limit 5
 
 # Find active tutors sorted by name
-node scripts/payload.js find tutors --where '{"status":{"equals":"active"}}' --sort name
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find tutors --where '{"status":{"equals":"active"}}' --sort name
 
 # Find recent calendar entries
-node scripts/payload.js find calendarEntries --sort -createdAt --limit 10
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find calendarEntries --sort -createdAt --limit 10
 
 # Count customers
-node scripts/payload.js count customers
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js count customers
 
 # Get user by ID with minimal depth
-node scripts/payload.js find-by-id users --id abc123 --depth 0
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find-by-id users --id abc123 --depth 0
 
 # Select specific fields only
-node scripts/payload.js find users --select '{"email":true,"name":true}' --limit 10
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find users --select '{"email":true,"name":true}' --limit 10
 
 # Query test database
-node scripts/payload.js find users --db test --limit 5
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js find users --db test --limit 5
 ```
 
 ---
@@ -181,19 +181,19 @@ Data can be passed via `--data` flag or piped through stdin.
 
 ```bash
 # Create a document
-node scripts/payload.js create customers --data '{"name":"John","email":"john@example.com"}'
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js create customers --data '{"name":"John","email":"john@example.com"}'
 
 # Create via stdin pipe
-echo '{"name":"Jane","email":"jane@example.com"}' | node scripts/payload.js create customers
+echo '{"name":"Jane","email":"jane@example.com"}' | node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js create customers
 
 # Update a document
-node scripts/payload.js update customers --id abc123 --data '{"name":"John Updated"}'
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js update customers --id abc123 --data '{"name":"John Updated"}'
 
 # Delete a document
-node scripts/payload.js delete customers --id abc123
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js delete customers --id abc123
 
 # Mutate on test database
-node scripts/payload.js create customers --db test --data '{"name":"Test User"}'
+node ${CLAUDE_PLUGIN_ROOT}/scripts/payload.js create customers --db test --data '{"name":"Test User"}'
 ```
 
 ---
@@ -245,4 +245,4 @@ Payload CMS (dev DB + optional test DB)
 
 - Server starts once, stays running (30min idle timeout)
 - Each CLI call makes an HTTP request to the running server
-- Server PID + port stored in `scripts/.payload-server.json`
+- Server PID + port stored in `${CLAUDE_PLUGIN_ROOT}/scripts/.payload-server.json`

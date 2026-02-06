@@ -10,8 +10,8 @@ Two CLIs for Google APIs, sharing the same OAuth credentials.
 ## Commands
 
 ```bash
-node scripts/gtm.js $ARGUMENTS   # Google Tag Manager API v2
-node scripts/ga.js $ARGUMENTS    # Google Analytics Admin API v1
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js $ARGUMENTS   # Google Tag Manager API v2
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js $ARGUMENTS    # Google Analytics Admin API v1
 ```
 
 Run with `help` for full command list.
@@ -20,23 +20,23 @@ Run with `help` for full command list.
 
 ### Credentials
 
-Store OAuth client credentials in `scripts/.gapis/credentials.json`:
+Store OAuth client credentials in `${CLAUDE_PLUGIN_ROOT}/scripts/.gapis/credentials.json`:
 
 ```bash
 # From file
-node scripts/gtm.js auth credentials set --file /path/to/credentials.json
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js auth credentials set --file /path/to/credentials.json
 
 # From clipboard
-node scripts/gtm.js auth credentials paste-win --overwrite   # Windows
-node scripts/gtm.js auth credentials paste-macos --overwrite # macOS
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js auth credentials paste-win --overwrite   # Windows
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js auth credentials paste-macos --overwrite # macOS
 ```
 
 ### Login
 
 ```bash
-node scripts/gtm.js auth login                 # edit scope (default)
-node scripts/gtm.js auth login --preset readonly
-node scripts/gtm.js auth login --preset publish
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js auth login                 # edit scope (default)
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js auth login --preset readonly
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js auth login --preset publish
 ```
 
 Scopes are combined for both APIs:
@@ -90,22 +90,22 @@ accounts > containers > workspaces > tags/triggers/variables/...
 
 ```bash
 # List accounts
-node scripts/gtm.js accounts list
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js accounts list
 
 # List containers
-node scripts/gtm.js containers list --accountId 6310095540
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js containers list --accountId 6310095540
 
 # List tags in workspace
-node scripts/gtm.js tags list --accountId 6310095540 --containerId 228346062 --workspaceId 20
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js tags list --accountId 6310095540 --containerId 228346062 --workspaceId 20
 
 # Get specific tag
-node scripts/gtm.js tags get --accountId 6310095540 --containerId 228346062 --workspaceId 20 --tagId 21
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js tags get --accountId 6310095540 --containerId 228346062 --workspaceId 20 --tagId 21
 
 # Get live version
-node scripts/gtm.js versions live --accountId 6310095540 --containerId 228346062
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js versions live --accountId 6310095540 --containerId 228346062
 
 # Create tag (JSON via stdin)
-echo '{"name":"My Tag","type":"html"}' | node scripts/gtm.js tags create --accountId <id> --containerId <id> --workspaceId <id>
+echo '{"name":"My Tag","type":"html"}' | node ${CLAUDE_PLUGIN_ROOT}/scripts/gtm.js tags create --accountId <id> --containerId <id> --workspaceId <id>
 ```
 
 ---
@@ -155,23 +155,23 @@ accounts > properties > data-streams > mp-secrets
 
 ```bash
 # List accounts
-node scripts/ga.js accounts list
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js accounts list
 
 # List account summaries (includes properties)
-node scripts/ga.js account-summaries list
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js account-summaries list
 
 # List properties
-node scripts/ga.js properties list --accountId 40457743
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js properties list --accountId 40457743
 
 # Get property
-node scripts/ga.js properties get --propertyId 452774256
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js properties get --propertyId 452774256
 
 # List data streams
-node scripts/ga.js data-streams list --propertyId 452774256
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js data-streams list --propertyId 452774256
 
 # List key events (conversions)
-node scripts/ga.js key-events list --propertyId 452774256
+node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js key-events list --propertyId 452774256
 
 # Create key event (JSON via stdin)
-echo '{"eventName":"sign_up","countingMethod":"ONCE_PER_EVENT"}' | node scripts/ga.js key-events create --propertyId <id>
+echo '{"eventName":"sign_up","countingMethod":"ONCE_PER_EVENT"}' | node ${CLAUDE_PLUGIN_ROOT}/scripts/ga.js key-events create --propertyId <id>
 ```
