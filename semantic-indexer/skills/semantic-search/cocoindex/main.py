@@ -80,11 +80,12 @@ def extract_extension(filename: str) -> str:
 # Transform flow for embeddings - allows reuse in search
 @cocoindex.transform_flow()
 def text_to_embedding(text: cocoindex.DataSlice[str]) -> cocoindex.DataSlice[list[float]]:
-    """Embed text using Gemini text-embedding-004."""
+    """Embed text using Gemini gemini-embedding-001."""
     return text.transform(
         cocoindex.functions.EmbedText(
             api_type=cocoindex.LlmApiType.GEMINI,
-            model="text-embedding-004",
+            model="gemini-embedding-001",
+            output_dimension=768,
             task_type="RETRIEVAL_DOCUMENT",
         )
     )

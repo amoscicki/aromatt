@@ -6,7 +6,7 @@ Semantic codebase search plugin for Claude Code using **CocoIndex**, **pgvector*
 
 - **Orchestrator**: CocoIndex (Python) - file watching & AST parsing
 - **Parsing Engine**: Tree-sitter (language-aware chunking)
-- **Embedding Model**: Google Gemini text-embedding-004
+- **Embedding Model**: Google Gemini gemini-embedding-001
 - **Vector Store**: PostgreSQL with pgvector
 
 ## Features
@@ -115,7 +115,7 @@ node scripts/search.js --query "..." --project . --limit 10 --threshold 0.7
 2. When files change, **Tree-sitter** parses them into AST nodes
 3. Functions, classes, and methods are extracted as semantic chunks
 4. Each chunk is hashed (SHA-256) for deduplication
-5. Changed chunks are embedded using **Gemini text-embedding-004**
+5. Changed chunks are embedded using **Gemini gemini-embedding-001**
 6. Embeddings are stored in **pgvector** for fast similarity search
 
 ## Environment Variables

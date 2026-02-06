@@ -14,7 +14,7 @@ CREATE TABLE codebase_segments (
     symbol_name TEXT,                     -- Function/class name if AST-parsed
     node_type TEXT,                       -- 'function', 'class', 'method', 'block', 'file'
     content_hash TEXT NOT NULL,           -- SHA-256 for deduplication
-    embedding vector(768),                -- Gemini text-embedding-004 dimension
+    embedding vector(768),                -- Gemini gemini-embedding-001 (output_dimension=768)
     updated_at TIMESTAMP DEFAULT NOW(),
 
     UNIQUE(project_root, file_path, start_line, end_line)
