@@ -1,0 +1,8 @@
+{
+  "name": "payload",
+  "version": "1.0.0",
+  "description": "Payload CMS query/mutate CLI for Claude Code (persistent local API)",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  }
+}
