@@ -1,15 +1,16 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "skills": [
     {
       "id": "docs-researcher",
       "name": "Documentation Researcher",
       "description": "Manage project knowledge base. Use init to setup, or provide a topic to research.",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "path": "skills/docs-researcher",
       "files": [
         "SKILL.md",
-        "../../agents/docs-researcher.md"
+        "agents/docs-researcher.md",
+        "scripts/init.js"
       ]
     },
     {

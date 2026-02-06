@@ -1,16 +1,23 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "skills": [
     {
       "id": "gapi",
       "name": "Google APIs CLI",
       "description": "Run local Node CLIs for Google Tag Manager and Google Analytics Admin APIs (OAuth2). Use for GTM containers/tags/triggers or GA properties/data-streams.",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "path": "skills/gapi",
       "files": [
         "SKILL.md",
-        "../../scripts/gtm.js",
-        "../../scripts/ga.js"
+        "scripts/gtm.js",
+        "scripts/ga.js",
+        "scripts/lib/auth.js",
+        "scripts/lib/ga-api.js",
+        "scripts/lib/gtm-api.js",
+        "scripts/lib/utils.js",
+        "scripts/templates/oauth-success.html",
+        "scripts/.gapis/credentials.json",
+        "scripts/.gapis/token.json"
       ]
     }
   ]

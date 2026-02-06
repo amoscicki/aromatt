@@ -12,7 +12,7 @@ Find code by meaning, not just keywords. **Always use this tool FIRST** before f
 ## Quick Search
 
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "$ARGUMENTS"
+python cocoindex/main.py search "." "$ARGUMENTS"
 ```
 
 ## Search Strategy
@@ -23,13 +23,13 @@ python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "$ARGUMENTS"
 
 ```bash
 # Search current project
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "user authentication flow"
+python cocoindex/main.py search "." "user authentication flow"
 
 # Search specific project
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "P:/myproject" "database connection pool"
+python cocoindex/main.py search "P:/myproject" "database connection pool"
 
 # With limit and threshold
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "query" 10 0.3
+python cocoindex/main.py search "." "query" 10 0.3
 ```
 
 ### 2. Read Results
@@ -50,14 +50,14 @@ Only use grep/glob if:
 ### Step 1: Find Callers (Upstream)
 
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "calls functionName"
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "imports from module-name"
+python cocoindex/main.py search "." "calls functionName"
+python cocoindex/main.py search "." "imports from module-name"
 ```
 
 ### Step 2: Find Dependencies (Downstream)
 
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py search "." "dependencies of functionName"
+python cocoindex/main.py search "." "dependencies of functionName"
 ```
 
 ### Step 3: Document Impact
@@ -75,42 +75,42 @@ The indexer runs as a persistent background daemon (pure Python).
 
 ```bash
 # Start daemon (runs in background, persists after Claude exits)
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py start
+python cocoindex/daemon.py start
 
 # Check daemon status
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py status
+python cocoindex/daemon.py status
 
 # View indexing logs
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py logs --tail 50
+python cocoindex/daemon.py logs --tail 50
 
 # Follow logs in real-time
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py logs --follow
+python cocoindex/daemon.py logs --follow
 
 # Stop daemon
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/daemon.py stop
+python cocoindex/daemon.py stop
 ```
 
 ## Project Management
 
 ```bash
 # Add project to watch list (for daemon)
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py projects add "P:/myproject"
+python cocoindex/main.py projects add "P:/myproject"
 
 # List all projects
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py projects list
+python cocoindex/main.py projects list
 
 # Remove project from watch list
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py projects remove "P:/myproject"
+python cocoindex/main.py projects remove "P:/myproject"
 ```
 
 ## Indexing
 
 ```bash
 # Index a project once (no daemon)
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "P:/myproject"
+python cocoindex/main.py index "P:/myproject"
 
 # Index with file watching (foreground)
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "P:/myproject" --watch
+python cocoindex/main.py index "P:/myproject" --watch
 ```
 
 ## Setup
@@ -124,16 +124,16 @@ python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "P:/myproject" --watch
 
 ```bash
 # 1. Start pgvector container
-cd ${CLAUDE_PLUGIN_ROOT}/docker && docker-compose up -d
+cd docker && docker-compose up -d
 
 # 2. Install Python dependencies
 pip install cocoindex psycopg2-binary
 
 # 3. Set Gemini API key (create credentials.json)
-echo '{"gemini_api_key": "your-key"}' > ${CLAUDE_PLUGIN_ROOT}/scripts/.semantic-indexer/credentials.json
+echo '{"gemini_api_key": "your-key"}' > scripts/.semantic-indexer/credentials.json
 
 # 4. Index your project
-python ${CLAUDE_PLUGIN_ROOT}/cocoindex/main.py index "."
+python cocoindex/main.py index "."
 ```
 
 ## Search Output Format
