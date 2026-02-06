@@ -1,0 +1,86 @@
+{
+  "version": "1.0.0",
+  "skills": [
+    {
+      "id": "docs-researcher",
+      "name": "Documentation Researcher",
+      "description": "Manage project knowledge base. Use init to setup, or provide a topic to research.",
+      "version": "1.0.3",
+      "path": "docs-researcher/skills/docs-researcher",
+      "files": [
+        "SKILL.md",
+        "../../agents/docs-researcher.md"
+      ]
+    },
+    {
+      "id": "research-methodology",
+      "name": "Research Methodology",
+      "description": "Research methodology templates and query patterns for documentation research.",
+      "version": "1.0.0",
+      "path": "docs-researcher/skills/research-methodology",
+      "files": [
+        "SKILL.md",
+        "references/document-template.md",
+        "references/query-patterns.md"
+      ]
+    },
+    {
+      "id": "gapi",
+      "name": "Google APIs CLI",
+      "description": "Run local Node CLIs for Google Tag Manager and Google Analytics Admin APIs (OAuth2). Use for GTM containers/tags/triggers or GA properties/data-streams.",
+      "version": "1.0.1",
+      "path": "gapi/skills/gapi",
+      "files": [
+        "SKILL.md",
+        "../../scripts/gtm.js",
+        "../../scripts/ga.js"
+      ]
+    },
+    {
+      "id": "payload-cms",
+      "name": "Payload CMS",
+      "description": "Query and mutate Payload CMS collections via persistent local server. Use for reading/writing data in dev or test databases.",
+      "version": "1.0.1",
+      "path": "payload/skills/payload-cms",
+      "files": [
+        "SKILL.md",
+        "../../scripts/payload.js"
+      ]
+    },
+    {
+      "id": "semantic-search",
+      "name": "Semantic Codebase Search",
+      "description": "Semantic codebase search with pgvector. Finds code by MEANING. USE THIS FIRST before grep/glob. Returns file paths + byte ranges for precise reads.",
+      "version": "1.2.1",
+      "path": "semantic-indexer/skills/semantic-search",
+      "files": [
+        "SKILL.md",
+        "../../cocoindex/main.py",
+        "../../cocoindex/daemon.py",
+        "../../docker/docker-compose.yml"
+      ]
+    },
+    {
+      "id": "swarm",
+      "name": "Swarm Execution",
+      "description": "Orchestrates parallel agent workflows for complex, multi-step tasks. Decomposes work into dependency-mapped waves and executes them with autonomous agents.",
+      "version": "1.0.5",
+      "path": "swarm/skills/swarm",
+      "files": [
+        "SKILL.md",
+        "../../agents/swarm-reviewer-opus.md",
+        "../../agents/swarm-reviewer-ultrathink.md",
+        "../../agents/swarm-worker-haiku.md",
+        "../../agents/swarm-worker-opus.md",
+        "../../agents/swarm-worker-ultrathink.md",
+        "../../commands/swarm.md",
+        "references/architect-protocol.md",
+        "references/auditor-protocol.md",
+        "references/escalation-rules.md",
+        "references/orchestrator-protocol.md",
+        "references/plan-format.md",
+        "references/worker-protocol.md"
+      ]
+    }
+  ]
+}
