@@ -7,6 +7,7 @@ Uses Tree-sitter for AST-aware chunking and Gemini for embeddings.
 import os
 import sys
 import json
+import shutil
 from pathlib import Path
 
 try:
@@ -17,18 +18,62 @@ except ImportError:
     sys.exit(1)
 
 # Configuration
-INDEXER_DIR = Path(__file__).parent.parent / "scripts" / ".semantic-indexer"
-PROJECTS_PATH = INDEXER_DIR / "projects.json"
-CREDENTIALS_PATH = INDEXER_DIR / "credentials.json"
+PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+LEGACY_INDEXER_DIR = PLUGIN_ROOT / "scripts" / ".semantic-indexer"
+GLOBAL_INDEXER_DIR = Path.home() / ".semantic-indexer"
 
 # Default DB config (matches docker-compose)
 DEFAULT_DB_URL = "postgresql://indexer:indexer_dev@localhost:5433/codebase_index"
 
 
+def get_indexer_dir() -> Path:
+    """Resolve shared indexer state directory across agent installs."""
+    configured = os.environ.get("SEMANTIC_INDEXER_HOME")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return GLOBAL_INDEXER_DIR.resolve()
+
+
+def migrate_legacy_state(indexer_dir: Path):
+    """Copy legacy local state once so old installs keep working."""
+    if not LEGACY_INDEXER_DIR.exists() or LEGACY_INDEXER_DIR.resolve() == indexer_dir:
+        return
+
+    for name in ("credentials.json", "projects.json", "config.json"):
+        src = LEGACY_INDEXER_DIR / name
+        dst = indexer_dir / name
+        if src.exists() and not dst.exists():
+            shutil.copy2(src, dst)
+
+
+def ensure_indexer_dir() -> Path:
+    indexer_dir = get_indexer_dir()
+    indexer_dir.mkdir(parents=True, exist_ok=True)
+    migrate_legacy_state(indexer_dir)
+    return indexer_dir
+
+
+def get_projects_path() -> Path:
+    return ensure_indexer_dir() / "projects.json"
+
+
+def get_credentials_path() -> Path:
+    return ensure_indexer_dir() / "credentials.json"
+
+
+def normalize_project_path(path: str) -> str:
+    normalized = os.path.abspath(path)
+    if sys.platform == "win32" and len(normalized) >= 2 and normalized[1] == ":":
+        normalized = normalized[0].upper() + normalized[1:]
+    return normalized
+
+
 def load_gemini_api_key() -> str:
     """Load Gemini API key from credentials file or environment."""
-    if CREDENTIALS_PATH.exists():
-        with open(CREDENTIALS_PATH) as f:
+    credentials_path = get_credentials_path()
+
+    if credentials_path.exists():
+        with open(credentials_path) as f:
             data = json.load(f)
             if "gemini_api_key" in data:
                 return data["gemini_api_key"]
@@ -39,23 +84,24 @@ def load_gemini_api_key() -> str:
 
     raise ValueError(
         "Missing Gemini API key. Set via:\n"
-        f"  echo '{{\"gemini_api_key\": \"YOUR_KEY\"}}' > {CREDENTIALS_PATH}\n"
+        f"  echo '{{\"gemini_api_key\": \"YOUR_KEY\"}}' > {credentials_path}\n"
         "Or set GEMINI_API_KEY environment variable."
     )
 
 
 def load_projects() -> list[dict]:
     """Load project list from projects.json."""
-    if not PROJECTS_PATH.exists():
+    projects_path = get_projects_path()
+    if not projects_path.exists():
         return []
-    with open(PROJECTS_PATH) as f:
+    with open(projects_path) as f:
         data = json.load(f)
         return data.get("projects", [])
 
 
 def get_db_url() -> str:
     """Get database URL from config or environment."""
-    config_path = INDEXER_DIR / "config.json"
+    config_path = ensure_indexer_dir() / "config.json"
 
     if config_path.exists():
         with open(config_path) as f:
@@ -362,6 +408,9 @@ def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.
     """Search the indexed codebase."""
     initialize()
 
+    # Normalize drive-letter case so query path matches indexed project_root.
+    project_root = normalize_project_path(project_root)
+
     # Generate query embedding using the transform flow
     query_embedding = text_to_embedding.eval(query)
 
@@ -422,12 +471,12 @@ def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.
 
 def projects_add(path: str):
     """Add a project to the watch list."""
-    path = os.path.abspath(path)
+    path = normalize_project_path(path)
     if not os.path.isdir(path):
         print(json.dumps({"ok": False, "error": f"Directory not found: {path}"}))
         sys.exit(1)
 
-    INDEXER_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_indexer_dir()
 
     projects = load_projects()
     existing = [p for p in projects if p["path"] == path]
@@ -441,7 +490,7 @@ def projects_add(path: str):
         "addedAt": datetime.utcnow().isoformat() + "Z",
     })
 
-    with open(PROJECTS_PATH, "w") as f:
+    with open(get_projects_path(), "w") as f:
         json.dump({"projects": projects}, f, indent=2)
 
     print(json.dumps({"ok": True, "action": "projects.add", "path": path}))
@@ -449,7 +498,7 @@ def projects_add(path: str):
 
 def projects_remove(path: str):
     """Remove a project from the watch list."""
-    path = os.path.abspath(path)
+    path = normalize_project_path(path)
     projects = load_projects()
     new_projects = [p for p in projects if p["path"] != path]
 
@@ -457,7 +506,7 @@ def projects_remove(path: str):
         print(json.dumps({"ok": False, "error": f"Project not found: {path}"}))
         sys.exit(1)
 
-    with open(PROJECTS_PATH, "w") as f:
+    with open(get_projects_path(), "w") as f:
         json.dump({"projects": new_projects}, f, indent=2)
 
     print(json.dumps({"ok": True, "action": "projects.remove", "path": path}))
@@ -498,14 +547,14 @@ def main():
         if len(sys.argv) < 3:
             print(json.dumps({"ok": False, "error": "Missing project path"}))
             sys.exit(1)
-        project_path = os.path.abspath(sys.argv[2])
+        project_path = normalize_project_path(sys.argv[2])
         watch = "--watch" in sys.argv
         index_project(project_path, watch=watch)
     elif command == "search":
         if len(sys.argv) < 4:
             print(json.dumps({"ok": False, "error": "Missing project path or query"}))
             sys.exit(1)
-        project_path = os.path.abspath(sys.argv[2])
+        project_path = normalize_project_path(sys.argv[2])
         query = sys.argv[3]
         limit = int(sys.argv[4]) if len(sys.argv) > 4 else 10
         threshold = float(sys.argv[5]) if len(sys.argv) > 5 else 0.3

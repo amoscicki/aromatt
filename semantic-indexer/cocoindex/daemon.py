@@ -10,32 +10,95 @@ import json
 import signal
 import subprocess
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
+import shutil
+import time
 
-INDEXER_DIR = Path(__file__).parent.parent / "scripts" / ".semantic-indexer"
-PID_PATH = INDEXER_DIR / "daemon.pid"
-LOG_PATH = INDEXER_DIR / "daemon.log"
-PROJECTS_PATH = INDEXER_DIR / "projects.json"
+PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+LEGACY_INDEXER_DIR = PLUGIN_ROOT / "scripts" / ".semantic-indexer"
+GLOBAL_INDEXER_DIR = Path.home() / ".semantic-indexer"
 
 
-def ensure_dir():
-    INDEXER_DIR.mkdir(parents=True, exist_ok=True)
+def get_indexer_dir() -> Path:
+    configured = os.environ.get("SEMANTIC_INDEXER_HOME")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return GLOBAL_INDEXER_DIR.resolve()
+
+
+def migrate_legacy_state(indexer_dir: Path):
+    if not LEGACY_INDEXER_DIR.exists() or LEGACY_INDEXER_DIR.resolve() == indexer_dir:
+        return
+
+    for name in ("credentials.json", "projects.json", "config.json", "daemon.pid", "daemon.log"):
+        src = LEGACY_INDEXER_DIR / name
+        dst = indexer_dir / name
+        if src.exists() and not dst.exists():
+            shutil.copy2(src, dst)
+
+
+def ensure_dir() -> Path:
+    indexer_dir = get_indexer_dir()
+    indexer_dir.mkdir(parents=True, exist_ok=True)
+    migrate_legacy_state(indexer_dir)
+    return indexer_dir
+
+
+def get_pid_path() -> Path:
+    return ensure_dir() / "daemon.pid"
+
+
+def get_log_path() -> Path:
+    return ensure_dir() / "daemon.log"
+
+
+def get_projects_path() -> Path:
+    return ensure_dir() / "projects.json"
+
+
+def get_fallback_interval_seconds() -> int:
+    raw = os.environ.get("SEMANTIC_INDEXER_WATCH_FALLBACK_SECONDS", "60")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 60
 
 
 def log(message: str):
     """Append to log file."""
-    ensure_dir()
-    timestamp = datetime.utcnow().isoformat() + "Z"
+    log_path = get_log_path()
+    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     line = json.dumps({"timestamp": timestamp, "message": message})
-    with open(LOG_PATH, "a") as f:
+    with open(log_path, "a") as f:
         f.write(line + "\n")
     print(line)
 
 
 def is_running(pid: int) -> bool:
     """Check if process is running."""
+    if pid <= 0:
+        return False
+
+    if sys.platform == "win32":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            output = (result.stdout or "") + (result.stderr or "")
+            if "No tasks are running" in output:
+                return False
+            return f"\"{pid}\"" in output or f",{pid}," in output
+        except Exception:
+            # Fall back to os.kill probe below.
+            pass
+
     try:
         os.kill(pid, 0)
+        return True
+    except PermissionError:
         return True
     except (OSError, ProcessLookupError):
         return False
@@ -43,29 +106,31 @@ def is_running(pid: int) -> bool:
 
 def get_pid() -> int | None:
     """Get daemon PID if running."""
-    if not PID_PATH.exists():
+    pid_path = get_pid_path()
+    if not pid_path.exists():
         return None
     try:
-        pid = int(PID_PATH.read_text().strip())
+        pid = int(pid_path.read_text().strip())
         return pid if is_running(pid) else None
     except (ValueError, FileNotFoundError):
         return None
 
 
 def save_pid(pid: int):
-    ensure_dir()
-    PID_PATH.write_text(str(pid))
+    get_pid_path().write_text(str(pid))
 
 
 def remove_pid():
-    if PID_PATH.exists():
-        PID_PATH.unlink()
+    pid_path = get_pid_path()
+    if pid_path.exists():
+        pid_path.unlink()
 
 
 def load_projects() -> list[dict]:
-    if not PROJECTS_PATH.exists():
+    projects_path = get_projects_path()
+    if not projects_path.exists():
         return []
-    with open(PROJECTS_PATH) as f:
+    with open(projects_path) as f:
         data = json.load(f)
         return data.get("projects", [])
 
@@ -91,7 +156,7 @@ def cmd_start():
     ensure_dir()
 
     # Spawn detached process running the watcher
-    log_file = open(LOG_PATH, "a")
+    log_file = open(get_log_path(), "a")
 
     # Use cocoindex CLI directly for live updates
     project_root = projects[0]["path"]
@@ -126,7 +191,7 @@ def cmd_start():
         "ok": True,
         "action": "daemon.start",
         "pid": process.pid,
-        "logPath": str(LOG_PATH),
+        "logPath": str(get_log_path()),
     }))
 
 
@@ -166,17 +231,19 @@ def cmd_stop():
 def cmd_status():
     """Show daemon status."""
     pid = get_pid()
+    pid_path = get_pid_path()
+    log_path = get_log_path()
     result = {
         "ok": True,
         "action": "daemon.status",
         "running": pid is not None,
         "pid": pid,
-        "pidPath": str(PID_PATH),
-        "logPath": str(LOG_PATH),
+        "pidPath": str(pid_path),
+        "logPath": str(log_path),
     }
 
-    if LOG_PATH.exists():
-        stats = LOG_PATH.stat()
+    if log_path.exists():
+        stats = log_path.stat()
         result["logSize"] = stats.st_size
         result["logModified"] = datetime.fromtimestamp(stats.st_mtime).isoformat() + "Z"
 
@@ -185,7 +252,8 @@ def cmd_status():
 
 def cmd_logs(tail: int = 50, follow: bool = False):
     """Show daemon logs."""
-    if not LOG_PATH.exists():
+    log_path = get_log_path()
+    if not log_path.exists():
         print(json.dumps({"ok": True, "action": "daemon.logs", "message": "No logs yet"}))
         return
 
@@ -194,12 +262,12 @@ def cmd_logs(tail: int = 50, follow: bool = False):
         import subprocess
         if sys.platform == "win32":
             # Windows: use PowerShell Get-Content -Wait
-            subprocess.run(["powershell", "-Command", f"Get-Content '{LOG_PATH}' -Tail {tail} -Wait"])
+            subprocess.run(["powershell", "-Command", f"Get-Content '{log_path}' -Tail {tail} -Wait"])
         else:
-            subprocess.run(["tail", "-f", "-n", str(tail), str(LOG_PATH)])
+            subprocess.run(["tail", "-f", "-n", str(tail), str(log_path)])
     else:
         # Read last N lines
-        content = LOG_PATH.read_text(encoding="utf-8", errors="replace")
+        content = log_path.read_text(encoding="utf-8", errors="replace")
         lines = content.strip().split("\n")
         for line in lines[-tail:]:
             # Handle Unicode on Windows console
@@ -252,6 +320,12 @@ def cmd_run(project_root: str):
     signal.signal(signal.SIGINT, handle_shutdown)
 
     log(f"Starting live updater for: {project_root}")
+    fallback_interval = get_fallback_interval_seconds()
+    last_update = time.monotonic()
+    if fallback_interval > 0:
+        log(f"Watch fallback enabled: periodic reindex every {fallback_interval}s when idle")
+    else:
+        log("Watch fallback disabled (SEMANTIC_INDEXER_WATCH_FALLBACK_SECONDS <= 0)")
 
     # Use FlowLiveUpdater with context manager for proper cleanup
     with cocoindex.FlowLiveUpdater(
@@ -267,13 +341,33 @@ def cmd_run(project_root: str):
                 if updates.updated_sources:
                     for source in updates.updated_sources:
                         log(f"Updated source: {source}")
+                    last_update = time.monotonic()
                 if not updates.active_sources:
                     # No more active sources, wait a bit and check again
-                    import time
                     time.sleep(1)
+
+                if fallback_interval > 0 and (time.monotonic() - last_update) >= fallback_interval:
+                    log("No watcher updates detected, triggering fallback one-shot index")
+                    try:
+                        result = subprocess.run(
+                            [sys.executable, str(Path(__file__).parent / "main.py"), "index", project_root],
+                            capture_output=True,
+                            text=True,
+                            timeout=1800,
+                            check=False,
+                        )
+                        if result.returncode == 0:
+                            log("Fallback index completed successfully")
+                        else:
+                            stderr = (result.stderr or "").strip()
+                            stdout = (result.stdout or "").strip()
+                            snippet = stderr[:500] or stdout[:500] or "No output"
+                            log(f"Fallback index failed (exit {result.returncode}): {snippet}")
+                    except Exception as e:
+                        log(f"Fallback index exception: {e}")
+                    last_update = time.monotonic()
             except Exception as e:
                 log(f"Error in update loop: {e}")
-                import time
                 time.sleep(5)
 
     log("Daemon stopped")

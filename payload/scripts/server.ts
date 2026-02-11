@@ -11,6 +11,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -38,7 +39,21 @@ function getArg(name: string, fallback: string): string {
 const PORT = Number(getArg('port', '8100'));
 const IDLE_TIMEOUT_MS = Number(getArg('idle-timeout', String(30 * 60 * 1000)));
 const TEST_DB_URL = getArg('test-db-url', process.env.TEST_POSTGRES_URL ?? '');
-const PID_FILE = path.join(__dirname, '.payload-server.json');
+const LEGACY_PID_FILE = path.join(__dirname, '.payload-server.json');
+const STATE_DIR = process.env.PAYLOAD_CMS_HOME
+  ? path.resolve(process.env.PAYLOAD_CMS_HOME)
+  : path.join(os.homedir(), '.payload-cms');
+const PID_FILE = path.join(STATE_DIR, 'server.json');
+
+function ensureStateDir() {
+  fs.mkdirSync(STATE_DIR, { recursive: true });
+}
+
+function migrateLegacyPidFile() {
+  ensureStateDir();
+  if (fs.existsSync(PID_FILE) || !fs.existsSync(LEGACY_PID_FILE)) return;
+  fs.copyFileSync(LEGACY_PID_FILE, PID_FILE);
+}
 
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = (
@@ -307,11 +322,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function main() {
+  migrateLegacyPidFile();
   await initPayload();
 
   process.stdout.write = originalStdoutWrite;
 
   server.listen(PORT, () => {
+    ensureStateDir();
     fs.writeFileSync(PID_FILE, JSON.stringify({ pid: process.pid, port: PORT }, null, 2));
 
     process.stderr.write(`[payload] Server ready on port ${PORT}\n`);

@@ -28,13 +28,13 @@
       "name": "semantic-indexer",
       "description": "Semantic codebase search with pgvector. Multi-project support, persistent daemon. USE FIRST before grep/glob.",
       "source": "./semantic-indexer",
-      "version": "1.2.0"
+      "version": "1.2.5"
     },
     {
       "name": "payload",
       "description": "Payload CMS query/mutate CLI for Claude Code (persistent local API server)",
       "source": "./payload",
-      "version": "1.0.0"
+      "version": "1.0.4"
     }
   ]
 }

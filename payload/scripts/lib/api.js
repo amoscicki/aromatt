@@ -3,14 +3,30 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const PID_FILE = path.join(__dirname, '..', '.payload-server.json');
+const LEGACY_PID_FILE = path.join(__dirname, '..', '.payload-server.json');
+const STATE_DIR = process.env.PAYLOAD_CMS_HOME
+  ? path.resolve(process.env.PAYLOAD_CMS_HOME)
+  : path.join(os.homedir(), '.payload-cms');
+const PID_FILE = path.join(STATE_DIR, 'server.json');
+
+function ensureStateDir() {
+  fs.mkdirSync(STATE_DIR, { recursive: true });
+}
+
+function migrateLegacyState() {
+  ensureStateDir();
+  if (fs.existsSync(PID_FILE) || !fs.existsSync(LEGACY_PID_FILE)) return;
+  fs.copyFileSync(LEGACY_PID_FILE, PID_FILE);
+}
 
 /**
  * Read server info (pid + port) from the PID file.
  * @returns {{ pid: number, port: number }}
  */
 function readServerInfo() {
+  migrateLegacyState();
   if (!fs.existsSync(PID_FILE)) {
     const err = new Error(
       'Payload server is not running. Start it with: payload start'

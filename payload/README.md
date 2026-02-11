@@ -30,6 +30,7 @@ Payload CMS CLI plugin for Claude Code. Query and mutate Payload collections via
 - Project must have `@payload-config` resolvable (standard Payload CMS setup)
 - `pnpm tsx` available in the project
 - PostgreSQL running for dev (and optionally test) database
+- Runtime state is shared in `~/.payload-cms` (override with `PAYLOAD_CMS_HOME`)
 
 ## Commands
 

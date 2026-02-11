@@ -17,6 +17,7 @@ Semantic codebase search plugin for Claude Code using **CocoIndex**, **pgvector*
 - **AST-aware chunking** - Tree-sitter extracts functions/classes for better results
 - **SHA-256 deduplication** - Only re-embeds changed code
 - **Gitignore-aware** - Respects `.gitignore` patterns
+- **Shared runtime state** - Uses `~/.semantic-indexer` so multiple agent installs share projects/credentials
 
 ## Prerequisites
 
@@ -123,6 +124,8 @@ node scripts/search.js --query "..." --project . --limit 10 --threshold 0.7
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GEMINI_API_KEY` | - | Gemini API key (fallback if no credentials file) |
+| `SEMANTIC_INDEXER_HOME` | `~/.semantic-indexer` | Shared runtime state directory |
+| `SEMANTIC_INDEXER_WATCH_FALLBACK_SECONDS` | `60` | Fallback one-shot reindex interval when watcher is idle |
 | `COCOINDEX_DATABASE_URL` | See below | Full Postgres connection URL |
 | `PGVECTOR_HOST` | localhost | Database host |
 | `PGVECTOR_PORT` | 5433 | Database port |

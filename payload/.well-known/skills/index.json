@@ -1,11 +1,11 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.4",
   "skills": [
     {
       "id": "payload-cms",
       "name": "Payload CMS",
       "description": "Query and mutate Payload CMS collections via persistent local server. Use for reading/writing data in dev or test databases.",
-      "version": "1.0.2",
+      "version": "1.0.4",
       "path": "skills/payload-cms",
       "files": [
         "SKILL.md",
