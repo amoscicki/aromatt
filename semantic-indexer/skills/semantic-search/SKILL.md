@@ -1,6 +1,7 @@
 ---
 name: semantic-search
-description: Semantic codebase search with pgvector. Finds code by MEANING. **USE THIS FIRST** before grep/glob. Returns file paths + byte ranges for precise reads.
+version: 2.0.0
+description: Semantic codebase search with pgvector. Finds code by MEANING. **USE THIS FIRST** before grep/glob. Returns file paths + byte ranges for precise reads. Multi-project support with auto-discovery — no manual setup needed.
 allowed-tools: Bash(python:*)
 argument-hint: "<natural language query> [project_path]"
 ---
@@ -8,6 +9,8 @@ argument-hint: "<natural language query> [project_path]"
 # Semantic Codebase Search
 
 Find code by meaning, not just keywords. **Always use this tool FIRST** before falling back to grep/glob.
+
+Projects are auto-discovered on first search — no manual `projects add` required.
 
 ## Quick Search
 
@@ -23,7 +26,7 @@ python "$PLUGIN_ROOT/cocoindex/main.py" search "." "$ARGUMENTS"
 ### 1. Run Semantic Search
 
 ```bash
-# Search current project
+# Search current project (auto-registers if not tracked)
 python $PLUGIN_ROOT/cocoindex/main.py search "." "user authentication flow"
 
 # Search specific project
@@ -35,7 +38,12 @@ python $PLUGIN_ROOT/cocoindex/main.py search "." "query" 10 0.3
 
 ### 2. Read Results
 
-Results include file paths and similarity scores. Read the relevant files to get full context.
+Results include file paths, similarity scores, and daemon health status.
+
+If `daemon_status: "not_running"` appears in output, start the daemon:
+```bash
+python $PLUGIN_ROOT/cocoindex/daemon.py start
+```
 
 ### 3. Fall Back to Grep/Glob
 
@@ -72,26 +80,44 @@ Before proceeding with edits, list:
 
 ## Daemon Management
 
-The indexer runs as a persistent background daemon (pure Python).
+The indexer runs as persistent background daemons — **one subprocess per registered project**.
 Runtime state is shared across agent installs in `~/.semantic-indexer` (override: `SEMANTIC_INDEXER_HOME`).
 Watcher fallback can be tuned with `SEMANTIC_INDEXER_WATCH_FALLBACK_SECONDS` (default: `60`).
 
 ```bash
-# Start daemon (runs in background, persists after Claude exits)
+# Start daemons for ALL registered projects
 python $PLUGIN_ROOT/cocoindex/daemon.py start
 
-# Check daemon status
+# Check per-project daemon status
 python $PLUGIN_ROOT/cocoindex/daemon.py status
 
-# View indexing logs
+# View indexing logs (all projects, prefixed with [project-name])
 python $PLUGIN_ROOT/cocoindex/daemon.py logs --tail 50
 
 # Follow logs in real-time
 python $PLUGIN_ROOT/cocoindex/daemon.py logs --follow
 
-# Stop daemon
+# Stop ALL daemons
 python $PLUGIN_ROOT/cocoindex/daemon.py stop
 ```
+
+### Multi-Project Behavior
+
+- `start` spawns one watcher subprocess per project, skipping already-running ones
+- `status` shows per-project running/dead state with PIDs
+- `stop` kills all daemon processes
+- PIDs stored in `~/.semantic-indexer/daemon-pids.json`
+- Each subprocess logs with `[project-name]` prefix for easy filtering
+
+### Auto-Discovery
+
+When you search a project that isn't registered yet, it's automatically added to the watch list.
+No manual `projects add` is needed for search to work (though the index must exist in pgvector).
+
+If the daemon isn't running for a searched project, the search output includes:
+- `daemon_status: "not_running"` — informational, search still works against existing index
+- `warning` — human-readable message
+- `hint` — command to start the daemon
 
 ## Project Management
 
@@ -99,7 +125,7 @@ python $PLUGIN_ROOT/cocoindex/daemon.py stop
 # Add project to watch list (for daemon)
 python $PLUGIN_ROOT/cocoindex/main.py projects add "P:/myproject"
 
-# List all projects
+# List all projects (shows daemon status per project)
 python $PLUGIN_ROOT/cocoindex/main.py projects list
 
 # Remove project from watch list
@@ -148,6 +174,7 @@ python $PLUGIN_ROOT/cocoindex/main.py index "."
   "query": "user authentication",
   "project_root": "P:\\myproject",
   "result_count": 5,
+  "daemon_status": "running",
   "results": [
     {
       "file_path": "src/auth/login.ts",
@@ -161,17 +188,27 @@ python $PLUGIN_ROOT/cocoindex/main.py index "."
 }
 ```
 
+When daemon is not running:
+```json
+{
+  "ok": true,
+  "result_count": 0,
+  "daemon_status": "not_running",
+  "warning": "Daemon not running for project 'myproject'. Index may be stale.",
+  "hint": "Start with: python daemon.py start"
+}
+```
+
 ## Command Reference
 
 | Command | Description |
 |---------|-------------|
-| `main.py search <project> <query> [limit] [threshold]` | Semantic search |
+| `main.py search <project> <query> [limit] [threshold]` | Semantic search (auto-registers project) |
 | `main.py index <project> [--watch]` | Index project |
 | `main.py projects add <path>` | Add project to daemon watch list |
-| `main.py projects list` | List watched projects |
+| `main.py projects list` | List watched projects with daemon status |
 | `main.py projects remove <path>` | Remove project from watch list |
-| `daemon.py start` | Start background indexer |
-| `daemon.py stop` | Stop indexer |
-| `daemon.py status` | Check daemon status |
+| `daemon.py start` | Start background indexers for all projects |
+| `daemon.py stop` | Stop all indexers |
+| `daemon.py status` | Per-project daemon status |
 | `daemon.py logs [--tail N] [--follow]` | View logs |
-

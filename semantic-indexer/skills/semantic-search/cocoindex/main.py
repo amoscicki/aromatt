@@ -8,7 +8,9 @@ import os
 import sys
 import json
 import shutil
+import subprocess
 from pathlib import Path
+from datetime import datetime, timezone
 
 try:
     import cocoindex
@@ -17,17 +19,14 @@ except ImportError:
     print("  pip install cocoindex psycopg2-binary", file=sys.stderr)
     sys.exit(1)
 
-# Configuration
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 LEGACY_INDEXER_DIR = PLUGIN_ROOT / "scripts" / ".semantic-indexer"
 GLOBAL_INDEXER_DIR = Path.home() / ".semantic-indexer"
 
-# Default DB config (matches docker-compose)
 DEFAULT_DB_URL = "postgresql://indexer:indexer_dev@localhost:5433/codebase_index"
 
 
 def get_indexer_dir() -> Path:
-    """Resolve shared indexer state directory across agent installs."""
     configured = os.environ.get("SEMANTIC_INDEXER_HOME")
     if configured:
         return Path(configured).expanduser().resolve()
@@ -35,7 +34,6 @@ def get_indexer_dir() -> Path:
 
 
 def migrate_legacy_state(indexer_dir: Path):
-    """Copy legacy local state once so old installs keep working."""
     if not LEGACY_INDEXER_DIR.exists() or LEGACY_INDEXER_DIR.resolve() == indexer_dir:
         return
 
@@ -69,7 +67,6 @@ def normalize_project_path(path: str) -> str:
 
 
 def load_gemini_api_key() -> str:
-    """Load Gemini API key from credentials file or environment."""
     credentials_path = get_credentials_path()
 
     if credentials_path.exists():
@@ -90,7 +87,6 @@ def load_gemini_api_key() -> str:
 
 
 def load_projects() -> list[dict]:
-    """Load project list from projects.json."""
     projects_path = get_projects_path()
     if not projects_path.exists():
         return []
@@ -100,7 +96,6 @@ def load_projects() -> list[dict]:
 
 
 def get_db_url() -> str:
-    """Get database URL from config or environment."""
     config_path = ensure_indexer_dir() / "config.json"
 
     if config_path.exists():
@@ -116,17 +111,87 @@ def get_db_url() -> str:
     return os.environ.get("COCOINDEX_DATABASE_URL", DEFAULT_DB_URL)
 
 
-# Helper function to extract file extension
+# --- Daemon health check helpers ---
+
+def _load_daemon_pids() -> dict[str, int]:
+    pids_path = ensure_indexer_dir() / "daemon-pids.json"
+    if not pids_path.exists():
+        return {}
+    try:
+        with open(pids_path) as f:
+            data = json.load(f)
+            return data.get("pids", {})
+    except (json.JSONDecodeError, ValueError):
+        return {}
+
+
+def _is_pid_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+
+    if sys.platform == "win32":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            output = (result.stdout or "") + (result.stderr or "")
+            if "No tasks are running" in output:
+                return False
+            return f'"{pid}"' in output or f",{pid}," in output
+        except Exception:
+            pass
+
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def check_daemon_status(project_root: str) -> dict:
+    """Check if daemon is running for a specific project."""
+    pids = _load_daemon_pids()
+    pid = pids.get(project_root)
+    if pid is None:
+        return {"running": False, "reason": "no_pid_registered"}
+    if not _is_pid_running(pid):
+        return {"running": False, "reason": "pid_dead", "pid": pid}
+    return {"running": True, "pid": pid}
+
+
+def _ensure_project_registered(project_root: str):
+    """Auto-add project to projects.json if not already there."""
+    if not os.path.isdir(project_root):
+        return
+
+    projects = load_projects()
+    existing = [p for p in projects if normalize_project_path(p["path"]) == project_root]
+    if existing:
+        return
+
+    projects.append({
+        "path": project_root,
+        "addedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    })
+
+    with open(get_projects_path(), "w") as f:
+        json.dump({"projects": projects}, f, indent=2)
+
+
+# --- CocoIndex flow definition ---
+
 @cocoindex.op.function()
 def extract_extension(filename: str) -> str:
-    """Extract file extension for language detection."""
     return os.path.splitext(filename)[1].lstrip(".")
 
 
-# Transform flow for embeddings - allows reuse in search
 @cocoindex.transform_flow()
 def text_to_embedding(text: cocoindex.DataSlice[str]) -> cocoindex.DataSlice[list[float]]:
-    """Embed text using Gemini gemini-embedding-001."""
     return text.transform(
         cocoindex.functions.EmbedText(
             api_type=cocoindex.LlmApiType.GEMINI,
@@ -138,18 +203,8 @@ def text_to_embedding(text: cocoindex.DataSlice[str]) -> cocoindex.DataSlice[lis
 
 @cocoindex.flow_def(name="CodebaseIndex")
 def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoindex.DataScope):
-    """
-    CocoIndex flow for codebase indexing.
-
-    1. Read source files from project directory
-    2. Parse with Tree-sitter for AST-aware chunking
-    3. Generate Gemini embeddings
-    4. Store in pgvector
-    """
-    # Get project root from environment (set before running)
     project_root = os.environ.get("SEMANTIC_INDEXER_PROJECT_ROOT", ".")
 
-    # File patterns to include
     include_patterns = [
         "*.ts", "*.tsx", "*.js", "*.jsx",
         "*.py", "*.go", "*.rs",
@@ -160,19 +215,13 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
         "*.md", "*.mdx",
     ]
 
-    # Exclude patterns (globset syntax: ** matches nested dirs)
     exclude_patterns = [
-        # Dependencies — nested to catch monorepo/turborepo/submodule layouts
         "**/node_modules",
         "**/bower_components",
         "**/.pnpm",
-
-        # VCS & metadata
         "**/.git",
         "**/.svn",
         "**/.hg",
-
-        # Build outputs
         "**/dist",
         "**/build",
         "**/out",
@@ -180,52 +229,36 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
         "**/.nuxt",
         "**/.turbo",
         "**/.cache",
-        "**/target",              # Rust / Java
+        "**/target",
         "**/__pycache__",
         "**/*.egg-info",
-
-        # Test & coverage artifacts
         "**/coverage",
         "**/.nyc_output",
-
-        # Virtual environments
         "**/.venv",
         "**/venv",
         "**/vendor",
-
-        # IDE & tooling
         "**/.idea",
         "**/.vscode",
         "**/.claude",
         "**/.swarm",
         "**/.specify",
-
-        # Monorepo / workspace nested packages with own deps
         "**/packages/*/node_modules",
         "**/apps/*/node_modules",
         "**/libs/*/node_modules",
-
-        # Minified & generated assets
         "**/*.min.js",
         "**/*.min.css",
         "**/*.map",
         "**/*.d.ts",
-
-        # Lock files
         "**/*.lock",
         "**/package-lock.json",
         "**/yarn.lock",
         "**/pnpm-lock.yaml",
         "**/shrinkwrap.json",
-
-        # Misc large/binary
         "**/*.wasm",
         "**/*.pyc",
         "**/*.pyo",
     ]
 
-    # Source: Local files with pattern filtering
-    # max_file_size: skip files > 500KB (bundled JS, large fixtures, etc.)
     data_scope["files"] = flow_builder.add_source(
         cocoindex.sources.LocalFile(
             path=project_root,
@@ -235,15 +268,11 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
         )
     )
 
-    # Create collector for code embeddings
     code_embeddings = data_scope.add_collector()
 
-    # Process each file
     with data_scope["files"].row() as file:
-        # Detect language from extension
         file["extension"] = file["filename"].transform(extract_extension)
 
-        # Split with Tree-sitter (AST-aware chunking)
         file["chunks"] = file["content"].transform(
             cocoindex.functions.SplitRecursively(),
             language=file["extension"],
@@ -251,12 +280,9 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
             chunk_overlap=100,
         )
 
-        # Process each chunk
         with file["chunks"].row() as chunk:
-            # Generate embedding
             chunk["embedding"] = chunk["text"].call(text_to_embedding)
 
-            # Collect with metadata
             code_embeddings.collect(
                 project_root=project_root,
                 file_path=file["filename"],
@@ -266,7 +292,6 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
                 embedding=chunk["embedding"],
             )
 
-    # Export to Postgres with pgvector
     code_embeddings.export(
         "codebase_segments",
         cocoindex.storages.Postgres(),
@@ -281,15 +306,12 @@ def codebase_index_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
 
 
 def initialize():
-    """Initialize CocoIndex with database settings."""
     db_url = get_db_url()
     api_key = load_gemini_api_key()
 
-    # Set environment variables for CocoIndex
     os.environ["COCOINDEX_DATABASE_URL"] = db_url
     os.environ["GEMINI_API_KEY"] = api_key
 
-    # Initialize CocoIndex
     docker_dir = Path(__file__).parent.parent / "docker"
     try:
         cocoindex.init(
@@ -308,10 +330,8 @@ def initialize():
 
 
 def index_project(project_root: str, watch: bool = False):
-    """Index a single project."""
     initialize()
 
-    # Set project root for flow
     os.environ["SEMANTIC_INDEXER_PROJECT_ROOT"] = project_root
 
     print(json.dumps({
@@ -320,11 +340,9 @@ def index_project(project_root: str, watch: bool = False):
         "watch_mode": watch,
     }))
 
-    # Setup the flow (creates tables)
     codebase_index_flow.setup()
 
     if watch:
-        # Live update mode with file watching
         updater = cocoindex.FlowLiveUpdater(
             codebase_index_flow,
             cocoindex.FlowLiveUpdaterOptions(print_stats=True)
@@ -336,90 +354,31 @@ def index_project(project_root: str, watch: bool = False):
         }))
         updater.wait()
     else:
-        # One-time update
-        update_info = codebase_index_flow.update(print_stats=True)
+        codebase_index_flow.update(print_stats=True)
         print(json.dumps({
             "event": "indexing_completed",
             "project": project_root,
         }))
 
 
-def run_daemon():
-    """Run the daemon, watching all configured projects."""
-    projects = load_projects()
-
-    if not projects:
-        print(json.dumps({
-            "event": "error",
-            "message": "No projects configured. Add projects with: node projects.js add <path>",
-        }))
-        sys.exit(1)
-
-    initialize()
-
-    print(json.dumps({
-        "event": "daemon_started",
-        "project_count": len(projects),
-        "projects": [p["path"] for p in projects],
-    }))
-
-    # For multi-project support, we use the first project
-    # TODO: Support multiple projects with separate flows
-    project = projects[0]
-    os.environ["SEMANTIC_INDEXER_PROJECT_ROOT"] = project["path"]
-
-    # Setup and start live updater
-    codebase_index_flow.setup()
-
-    updater = cocoindex.FlowLiveUpdater(
-        codebase_index_flow,
-        cocoindex.FlowLiveUpdaterOptions(print_stats=True)
-    )
-    updater.start()
-
-    print(json.dumps({
-        "event": "watching",
-        "project": project["path"],
-    }))
-
-    # Keep daemon running
-    import signal
-
-    def handle_signal(signum, frame):
-        print(json.dumps({"event": "shutdown_requested"}))
-        updater.abort()
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, handle_signal)
-    signal.signal(signal.SIGINT, handle_signal)
-
-    # SIGHUP for reload (Unix only)
-    if hasattr(signal, 'SIGHUP'):
-        def handle_sighup(signum, frame):
-            print(json.dumps({"event": "reload_requested"}))
-
-        signal.signal(signal.SIGHUP, handle_sighup)
-
-    # Wait for updater
-    updater.wait()
-
-
 def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.3):
-    """Search the indexed codebase."""
     initialize()
 
-    # Normalize drive-letter case so query path matches indexed project_root.
     project_root = normalize_project_path(project_root)
 
-    # Generate query embedding using the transform flow
+    # Auto-register project if not in projects.json
+    _ensure_project_registered(project_root)
+
+    # Check daemon health for this project
+    daemon_status = check_daemon_status(project_root)
+
+    # Generate query embedding
     query_embedding = text_to_embedding.eval(query)
 
-    # Get table name
     table_name = cocoindex.utils.get_target_storage_default_name(
         codebase_index_flow, "codebase_segments"
     )
 
-    # Search in pgvector
     import psycopg2
     db_url = get_db_url()
     conn = psycopg2.connect(db_url)
@@ -442,7 +401,6 @@ def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.
     results = []
     for row in cur.fetchall():
         location = row[3]
-        # Convert location (NumericRange or similar) to dict
         if hasattr(location, 'lower') and hasattr(location, 'upper'):
             location_dict = {"start": location.lower, "end": location.upper}
         else:
@@ -460,17 +418,26 @@ def search(project_root: str, query: str, limit: int = 10, threshold: float = 0.
     cur.close()
     conn.close()
 
-    print(json.dumps({
+    output = {
         "ok": True,
         "query": query,
         "project_root": project_root,
         "result_count": len(results),
         "results": results,
-    }, indent=2))
+    }
+
+    # Include daemon health warnings
+    if not daemon_status["running"]:
+        output["daemon_status"] = "not_running"
+        output["warning"] = "Daemon not running for this project. Index may be stale. Start with: python daemon.py start"
+
+    if len(results) == 0 and not daemon_status["running"]:
+        output["hint"] = "No results found. The project may not be indexed yet. Run: python main.py index \"" + project_root + "\""
+
+    print(json.dumps(output, indent=2))
 
 
 def projects_add(path: str):
-    """Add a project to the watch list."""
     path = normalize_project_path(path)
     if not os.path.isdir(path):
         print(json.dumps({"ok": False, "error": f"Directory not found: {path}"}))
@@ -479,15 +446,14 @@ def projects_add(path: str):
     ensure_indexer_dir()
 
     projects = load_projects()
-    existing = [p for p in projects if p["path"] == path]
+    existing = [p for p in projects if normalize_project_path(p["path"]) == path]
     if existing:
         print(json.dumps({"ok": True, "message": "Project already in list", "path": path}))
         return
 
-    from datetime import datetime
     projects.append({
         "path": path,
-        "addedAt": datetime.utcnow().isoformat() + "Z",
+        "addedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     })
 
     with open(get_projects_path(), "w") as f:
@@ -497,10 +463,9 @@ def projects_add(path: str):
 
 
 def projects_remove(path: str):
-    """Remove a project from the watch list."""
     path = normalize_project_path(path)
     projects = load_projects()
-    new_projects = [p for p in projects if p["path"] != path]
+    new_projects = [p for p in projects if normalize_project_path(p["path"]) != path]
 
     if len(new_projects) == len(projects):
         print(json.dumps({"ok": False, "error": f"Project not found: {path}"}))
@@ -513,18 +478,28 @@ def projects_remove(path: str):
 
 
 def projects_list():
-    """List all projects in watch list."""
     projects = load_projects()
+
+    # Enrich with daemon status per project
+    enriched = []
+    for p in projects:
+        path = normalize_project_path(p["path"])
+        status = check_daemon_status(path)
+        enriched.append({
+            **p,
+            "path": path,
+            "daemon_running": status["running"],
+        })
+
     print(json.dumps({
         "ok": True,
         "action": "projects.list",
-        "count": len(projects),
-        "projects": projects,
+        "count": len(enriched),
+        "projects": enriched,
     }, indent=2))
 
 
 def main():
-    """CLI entry point."""
     if len(sys.argv) < 2:
         print(json.dumps({
             "ok": True,
@@ -534,16 +509,13 @@ def main():
                 "projects add": "python main.py projects add <path>",
                 "projects remove": "python main.py projects remove <path>",
                 "projects list": "python main.py projects list",
-                "daemon": "python main.py daemon",
             }
         }, indent=2))
         return
 
     command = sys.argv[1]
 
-    if command == "daemon":
-        run_daemon()
-    elif command == "index":
+    if command == "index":
         if len(sys.argv) < 3:
             print(json.dumps({"ok": False, "error": "Missing project path"}))
             sys.exit(1)
