@@ -1,0 +1,8 @@
+{
+  "name": "cursor-cli-subagent",
+  "version": "1.0.0",
+  "description": "Delegate bounded tasks to native Windows Cursor Agent CLI with composer-2.5",
+  "author": {
+    "name": "Arkadiusz Moscicki"
+  }
+}

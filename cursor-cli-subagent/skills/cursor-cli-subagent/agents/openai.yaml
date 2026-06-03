@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cursor CLI Subagent"
+  short_description: "Delegate bounded tasks to Cursor Agent CLI"
+  default_prompt: "Use $cursor-cli-subagent to ask Cursor Agent to inspect this workspace with Composer 2.5."
+
+policy:
+  allow_implicit_invocation: true

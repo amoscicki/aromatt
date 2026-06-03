@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "skills": [
+    {
+      "id": "cursor-cli-subagent",
+      "name": "Cursor CLI Subagent",
+      "description": "Delegate bounded tasks to native Windows Cursor Agent CLI with composer-2.5.",
+      "version": "1.0.0",
+      "path": "skills/cursor-cli-subagent",
+      "files": [
+        "SKILL.md",
+        "scripts/invoke_cursor_subagent.ps1",
+        "agents/openai.yaml"
+      ]
+    }
+  ]
+}
